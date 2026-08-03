@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>彩纸质感对比 · prototype（一次性）</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+  <div class="head-row">
+    <h1>彩纸质感 · 三种实现路线对比</h1>
+    <span class="proto-tag">PROTOTYPE — 一次性代码</span>
+  </div>
+  <div class="mode-bar" role="tablist">
+    <button data-mode="procedural" class="mode-btn active">A · 纯程序化<br><small>SVG 矢量滤镜</small></button>
+    <button data-mode="texture" class="mode-btn">B · 位图纹理<br><small>Canvas 生成纸张纹理</small></button>
+    <button data-mode="mixed" class="mode-btn">C · 混合<br><small>褶皱滤镜 + 纹理叠加</small></button>
+  </div>
+  <div class="style-bar" id="style-bar">
+    <span class="style-label">矢量纹理风格</span>
+    <button data-style="fold" class="style-btn active">褶皱</button>
+    <button data-style="watercolor" class="style-btn">水彩晕染</button>
+    <button data-style="grain" class="style-btn">颗粒</button>
+    <button data-style="weave" class="style-btn">织物拉丝</button>
+    <button data-style="marble" class="style-btn">大理石纹</button>
+    <button data-style="fiber" class="style-btn">纤维</button>
+  </div>
+  <p class="hint">拖拽移动纸片 · 滚轮旋转 · 双击换色 · 切换下方模式对比质感</p>
+</header>
+
+<main>
+  <section class="stage-wrap">
+    <div id="stage"></div>
+  </section>
+
+  <aside class="side">
+    <div class="panel">
+      <h2>当前方案 <span id="mode-name"></span></h2>
+      <p id="mode-desc" class="desc"></p>
+    </div>
+
+    <div class="panel">
+      <h2>对比维度</h2>
+      <table class="cmp">
+        <thead><tr><th></th><th>A 程序化</th><th>B 纹理</th><th>C 混合</th></tr></thead>
+        <tbody>
+          <tr><td>质感真实度</td><td class="c1">中-高</td><td class="c2">高</td><td class="c3">高</td></tr>
+          <tr><td>SVG 矢量导出</td><td class="c1">✅ 全矢量</td><td class="c2">❌ 嵌入 base64</td><td class="c3">⚠️ 部分位图</td></tr>
+          <tr><td>导出文件体积</td><td class="c1">小</td><td class="c2">大</td><td class="c3">中</td></tr>
+          <tr><td>边缘 / 形状实时形变</td><td class="c1">✅ 可实时</td><td class="c2">⚠️ 纹理静态</td><td class="c3">✅ 可实时</td></tr>
+          <tr><td>纹理色彩随元素变色</td><td class="c1">✅</td><td class="c2">⚠️ 需重新生成</td><td class="c3">⚠️ 部分</td></tr>
+          <tr><td>纹理种类</td><td class="c1">无限（程序化参数空间，<br>本原型已演示 6 种）</td><td class="c2">取决于素材库数量</td><td class="c3">同 A + 素材叠加</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="panel">
+      <h2>导出测试（SVG）</h2>
+      <button id="export-btn">导出当前为 SVG</button>
+      <div id="export-info" class="export-info"></div>
+      <pre id="export-preview" class="export-preview"></pre>
+    </div>
+  </aside>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>
