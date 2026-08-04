@@ -79,24 +79,25 @@ Panel 内边距 14px,magnet 之间 12px,磁贴内 12px,组件内 8/12/16。
 
 ## Layout
 
-**App shell grid** (top-dark 骨架的浅色重构):
+**App shell grid** (顶栏 + 三栏:左 工具 + 图层 / 中 画布 / 右 色板 + 纹理 + 属性):
 
 ```
 ┌─────────────────────────────────────────────┐
 │ topbar  56px                                │
-├──────┬───────────────────────────┬──────────┤
-│ tool │                           │  right   │
-│ bar  │       canvas-area         │  rail    │
-│ 72px │                           │  280px   │
-│      │                           │          │
+├──────────┬───────────────────────┬──────────┤
+│  left    │                       │  right   │
+│  rail    │     canvas-area       │  rail    │
+│  260px   │                       │  280px   │
+│ 工具+图层 │                       │ 色板/纹理 │
+│          │                       │  / 属性  │
 └──────┴───────────────────────────┴──────────┘
 ```
 
 grid-template-rows: `56px 1fr`
-grid-template-columns: `72px 1fr 280px`
-grid-template-areas: `topbar topbar topbar / tools canvas right`
+grid-template-columns: `260px 1fr 280px`
+grid-template-areas: `topbar topbar topbar / left canvas right`
 
-Right rail 内部 stacked magnets: 图层磁贴 / 色板磁贴 / 纹理磁贴 / 属性磁贴;每个磁贴独立成块,块间 12px gap。
+Left rail 内部 stacked magnets:工具磁贴(图标 + 文字,2 列网格) / 图层磁贴;右栏 stacked magnets:色板 / 纹理 / 属性。每个磁贴独立成块,块间 12px gap。
 
 ## Components
 
@@ -110,7 +111,7 @@ Right rail 内部 stacked magnets: 图层磁贴 / 色板磁贴 / 纹理磁贴 / 
 | Color chip | 32x32 圆角矩形,2px 描边 | 选中态描边 ink,scale 1.05 |
 | Texture tile | 60x60 圆角矩形,平铺 SVG 纹理 | 选中态描边 primary |
 | Prop slider | 圆点 16px,轨道 4px,色 primary | 数值实时显示在右 |
-| Tool button | 44x44,圆角 12px,选中纯白填 + primary 1px 描边 | 图标用 22px 圆体字 |
+| Tool button | 左栏 2 列网格,圆角 10px,图标 18px + 文字 12px 半粗 | 选中态: surface 内填 + primary 1px 描边 + primary 文字 |
 
 ## Motion
 
