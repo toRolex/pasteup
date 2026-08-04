@@ -1,18 +1,15 @@
 <!DOCTYPE html>
 <!--
-  pasteup · P1 UI 视觉锚定样本
-  基于 PRODUCT.md + DESIGN.md 落地,作为 P1 实现的视觉参考。
-  骨架沿用 top-dark 布局(顶栏 + 左工具栏 + 中画布 + 右栏),色板换为浅米/麻 + 苔绿。
-  字体:Caveat(英文手写感) + ZCOOL KuaiLe(中文圆体) + Nunito(圆润正文)。
-  静态 HTML,无构建,直接打开即可。
-
-  文件位置:main / prototypes / p1-ui-sample / index.html
+  pasteup · P1 UI 视觉锚定样本 v2
+  - 骨架调成: 顶栏 56px / 左栏 260px(工具栏-图标+文字 + 图层) / 中画布 / 右栏 280px(色板/纹理/属性)
+  - 视觉: 浅米/麻 + 苔绿,圆角 12px,圆润字体
+  - 静态 HTML,直接打开即可
 -->
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>pasteup · P1 UI 样本</title>
+<title>pasteup · P1 UI 样本 v2</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Nunito:wght@400;600;700;800&family=ZCOOL+KuaiLe&display=swap" rel="stylesheet" />
@@ -41,26 +38,69 @@
     </div>
   </header>
 
-  <!-- Tool sidebar -->
-  <aside class="toolbar">
-    <button class="tool" data-tip="选择" aria-label="选择">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l7 18 2.5-7.5L20 11z"/></svg>
-    </button>
-    <button class="tool is-active" data-tip="描摹" aria-label="描摹">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l4-1 11-11-3-3L5 16l-1 4z"/></svg>
-    </button>
-    <button class="tool" data-tip="取色" aria-label="取色">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4l6 6-9 9H5v-6l9-9z"/><circle cx="17" cy="7" r="1.5" fill="currentColor"/></svg>
-    </button>
-    <button class="tool" data-tip="移动" aria-label="移动">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M3 12h18M8 8l-5 4 5 4M16 8l5 4-5 4M8 16l-5-4 5-4M16 16l5-4-5-4"/></svg>
-    </button>
-    <button class="tool" data-tip="缩放" aria-label="缩放">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21v-6h6M21 3v6h-6M3 3l8 8M21 21l-8-8"/></svg>
-    </button>
-    <button class="tool" data-tip="旋转" aria-label="旋转">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5"/></svg>
-    </button>
+  <!-- Left rail: tool list (图标+文字) + layers -->
+  <aside class="left-rail">
+    <section class="magnet tool-magnet">
+      <header class="magnet-head">
+        <h3>工具</h3>
+        <span class="magnet-dot"></span>
+      </header>
+      <div class="tool-list">
+        <button class="tool" aria-label="选择">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l7 18 2.5-7.5L20 11z"/></svg>
+          <span>选择</span>
+        </button>
+        <button class="tool is-active" aria-label="描摹">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l4-1 11-11-3-3L5 16l-1 4z"/></svg>
+          <span>描摹</span>
+        </button>
+        <button class="tool" aria-label="取色">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4l6 6-9 9H5v-6l9-9z"/><circle cx="17" cy="7" r="1.5" fill="currentColor"/></svg>
+          <span>取色</span>
+        </button>
+        <button class="tool" aria-label="移动">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M3 12h18"/></svg>
+          <span>移动</span>
+        </button>
+        <button class="tool" aria-label="缩放">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21v-6h6M21 3v6h-6M3 3l8 8M21 21l-8-8"/></svg>
+          <span>缩放</span>
+        </button>
+        <button class="tool" aria-label="旋转">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5"/></svg>
+          <span>旋转</span>
+        </button>
+      </div>
+    </section>
+
+    <section class="magnet layer-magnet">
+      <header class="magnet-head">
+        <h3>图层</h3>
+        <span class="magnet-dot"></span>
+      </header>
+      <div class="layer-list">
+        <div class="layer-item">
+          <span class="layer-thumb" style="background: #efe2c8;"></span>
+          <span class="layer-name">照片底图</span>
+          <span class="layer-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg></span>
+        </div>
+        <div class="layer-item is-active">
+          <span class="layer-thumb" style="background: #d68a55;"></span>
+          <span class="layer-name">前景纸片 1</span>
+          <span class="layer-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l5 5L20 7"/></svg></span>
+        </div>
+        <div class="layer-item">
+          <span class="layer-thumb" style="background: #7a8b5c;"></span>
+          <span class="layer-name">前景纸片 2</span>
+          <span class="layer-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l5 5L20 7"/></svg></span>
+        </div>
+        <div class="layer-item">
+          <span class="layer-thumb" style="background: #b9a4c6;"></span>
+          <span class="layer-name">前景纸片 3</span>
+          <span class="layer-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l5 5L20 7"/></svg></span>
+        </div>
+      </div>
+    </section>
   </aside>
 
   <!-- Canvas -->
@@ -91,39 +131,8 @@
     </div>
   </main>
 
-  <!-- Right rail -->
+  <!-- Right rail: 色板 / 纹理 / 属性 -->
   <aside class="right-rail">
-    <!-- Layers magnet -->
-    <section class="magnet">
-      <header class="magnet-head">
-        <h3>图层</h3>
-        <span class="magnet-dot"></span>
-      </header>
-      <div class="layer-list">
-        <div class="layer-item">
-          <span class="layer-thumb" style="background: #efe2c8;"></span>
-          <span class="layer-name">照片底图</span>
-          <span class="layer-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg></span>
-        </div>
-        <div class="layer-item is-active">
-          <span class="layer-thumb" style="background: #d68a55;"></span>
-          <span class="layer-name">前景纸片 1</span>
-          <span class="layer-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l5 5L20 7"/></svg></span>
-        </div>
-        <div class="layer-item">
-          <span class="layer-thumb" style="background: #7a8b5c;"></span>
-          <span class="layer-name">前景纸片 2</span>
-          <span class="layer-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l5 5L20 7"/></svg></span>
-        </div>
-        <div class="layer-item">
-          <span class="layer-thumb" style="background: #b9a4c6;"></span>
-          <span class="layer-name">前景纸片 3</span>
-          <span class="layer-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l5 5L20 7"/></svg></span>
-        </div>
-      </div>
-    </section>
-
-    <!-- Color palette magnet -->
     <section class="magnet">
       <header class="magnet-head">
         <h3>色板</h3>
@@ -145,23 +154,21 @@
       </div>
     </section>
 
-    <!-- Texture magnet -->
     <section class="magnet">
       <header class="magnet-head">
         <h3>纹理</h3>
         <span class="magnet-dot"></span>
       </header>
       <div class="texture-grid">
-        <div class="texture-tile is-active" style="background-image: radial-gradient(circle at 20% 30%, rgba(122,139,92,0.22), transparent 40%), radial-gradient(circle at 70% 60%, rgba(168,132,90,0.16), transparent 40%), linear-gradient(135deg, #d9c9a8, #a8845a);"></div>
-        <div class="texture-tile" style="background-image: linear-gradient(135deg, #e8d5b7, #b89b72);"></div>
-        <div class="texture-tile" style="background-image: repeating-linear-gradient(45deg, #c8b89a, #c8b89a 2px, #8c7a5e 2px, #8c7a5e 4px);"></div>
+        <div class="texture-tile is-active" style="background-color: #d9c9a8; background-image: radial-gradient(circle at 20% 30%, rgba(122,139,92,0.22), transparent 40%), radial-gradient(circle at 70% 60%, rgba(168,132,90,0.16), transparent 40%), linear-gradient(135deg, #d9c9a8, #a8845a);"></div>
+        <div class="texture-tile" style="background: linear-gradient(135deg, #e8d5b7, #b89b72);"></div>
+        <div class="texture-tile" style="background: repeating-linear-gradient(45deg, #c8b89a, #c8b89a 2px, #8c7a5e 2px, #8c7a5e 4px);"></div>
         <div class="texture-tile" style="background-color:#d6c2a3; background-image: radial-gradient(circle at 30% 50%, rgba(58,42,30,0.18), transparent 50%);"></div>
         <div class="texture-tile" style="background-color:#b59a6f; background-image: radial-gradient(circle at 20% 20%, rgba(58,42,30,0.18) 1px, transparent 1px), radial-gradient(circle at 60% 70%, rgba(58,42,30,0.15) 1px, transparent 1px); background-size: 6px 6px, 8px 8px;"></div>
-        <div class="texture-tile" style="background-image: repeating-linear-gradient(0deg, #cdb78a, #cdb78a 1px, #b8a374 1px, #b8a374 2px);"></div>
+        <div class="texture-tile" style="background: repeating-linear-gradient(0deg, #cdb78a, #cdb78a 1px, #b8a374 1px, #b8a374 2px);"></div>
       </div>
     </section>
 
-    <!-- Properties magnet -->
     <section class="magnet">
       <header class="magnet-head">
         <h3>属性</h3>
