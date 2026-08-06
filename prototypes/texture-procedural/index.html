@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>程序化纹理生成器 · 真实感验证 · prototype（一次性）</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+  <div class="head-row">
+    <h1>程序化纹理生成器 · seed 驱动 6 风格 · 真实感验证</h1>
+    <span class="proto-tag">PROTOTYPE — wayfinder #16</span>
+  </div>
+  <p class="hint">
+    验证焦点：① 各风格是否达「手工彩纸」质感；② 同色多纸片并排是否露馅（明度已归一化，应只差结构不差颜色）。
+    每风格点击「过 / 降级」，底栏汇总决议。灰度生成 → #9 程序合成着色（multiply）→ dataURL。
+  </p>
+</header>
+
+<div class="controls">
+  <div class="ctrl-group">
+    <span class="ctrl-label">颜色</span>
+    <div id="swatches" class="swatches"></div>
+    <input type="color" id="color-input" value="#d97a5c">
+  </div>
+  <div class="ctrl-group">
+    <span class="ctrl-label">纸张亮度</span>
+    <input type="range" id="base-slider" min="120" max="220" value="178">
+    <span id="base-val" class="ctrl-val"></span>
+  </div>
+  <div class="ctrl-group">
+    <button id="reshuffle">⟳ 重掷全部 seed</button>
+  </div>
+</div>
+
+<main>
+  <div id="grid" class="grid"></div>
+</main>
+
+<aside class="verdict-panel">
+  <h2>决议汇总（HITL 收口）</h2>
+  <input id="extra-note" placeholder="整体结论（是否达 MVP 质感线）…">
+  <pre id="summary" class="summary"></pre>
+  <button id="copy-summary">复制决议文本</button>
+</aside>
+
+<script src="app.js"></script>
+</body>
+</html>
