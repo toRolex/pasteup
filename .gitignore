@@ -13,3 +13,6 @@ src-tauri/target/
 # 原型中间产物（截图等）
 prototypes/**/shot*.png
 prototypes/**/shots/
+
+# 抓取产物（firecrawl）
+.firecrawl/
