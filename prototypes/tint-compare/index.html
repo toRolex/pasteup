@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>纹理着色对比 · 程序合成 vs 混合模式叠加（wayfinder #9）</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+  <div class="head-row">
+    <h1>纹理着色管线对比 · 合成着色 vs 混合模式叠加</h1>
+    <span class="proto-tag">PROTOTYPE — wayfinder #9 · 一次性代码</span>
+  </div>
+  <p class="hint">同一灰度明度层 × 同一用户色，左「程序合成」右「混合模式叠加」。拖动色板观察两者视觉与改色响应。</p>
+</header>
+
+<main>
+  <section class="panel verdict">
+    <h2>结论速览</h2>
+    <table class="cmp">
+      <thead><tr><th>维度</th><th>A · 程序合成（灰度×色 → 单图）</th><th>B · 混合模式叠加（灰纹 multiply 色层）</th></tr></thead>
+      <tbody>
+        <tr><td>视觉结果</td><td class="win">与 B 等效（下方像素对比 98% 一致）</td><td class="win">与 A 等效</td></tr>
+        <tr><td>改色路径</td><td>重新合成 <strong>&lt;1 ms</strong>（可缓存）</td><td class="win">只换参数，GPU 即时</td></tr>
+        <tr><td>缓存 / 内存</td><td>每 色×纹理 一张位图（10×12 色池 ≈ 72 MB）</td><td class="win">10 张灰度图 + 颜色参数（≈ 6 MB）</td></tr>
+        <tr><td>SVG 导出保真</td><td class="win">pattern 内嵌带色 dataURL，自包含</td><td><strong>❌ gco 丢失 + 灰纹 URL 引用</strong>，外部渲染器颜色失效</td></tr>
+        <tr><td>纹理缩放/旋转（#12 接线）</td><td class="win">合成时应用 → 契合「预烘焙」路径</td><td>走 patternTransform → 依赖「补丁」路径</td></tr>
+      </tbody>
+    </table>
+    <p class="cap">判定倾向：<strong>A 程序合成</strong>（视觉等效，但导出保真与自包含全面胜出，且与 #12 预烘焙选型契合）。</p>
+  </section>
+
+  <section class="controls panel">
+    <div class="ctl-row">
+      <div class="ctl">
+        <span class="ctl-label">纹理（灰度明度层）</span>
+        <select id="tex-select"></select>
+      </div>
+      <div class="ctl">
+        <span class="ctl-label">用户颜色</span>
+        <div id="swatches"></div>
+        <input type="color" id="color-input" value="#d97a5c">
+      </div>
+      <div class="ctl">
+        <span class="ctl-label">合成耗时（方案 A 每次改色）</span>
+        <span id="compose-time" class="metric">—</span>
+      </div>
+      <div class="ctl">
+        <span class="ctl-label">方案 A 缓存</span>
+        <span id="cache-info" class="metric">0 张</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="stage-row">
+    <figure class="stage-card">
+      <figcaption>A · 程序合成 <small>灰度明度 × 用户色 → 离屏合成单图 → pattern</small></figcaption>
+      <canvas id="cvA" width="520" height="420"></canvas>
+      <p class="cap" id="capA">改色=重新合成位图</p>
+    </figure>
+    <figure class="stage-card">
+      <figcaption>B · 混合模式叠加 <small>灰度 pattern 层 × multiply 色块层（运行时混合）</small></figcaption>
+      <canvas id="cvB" width="520" height="420"></canvas>
+      <p class="cap" id="capB">改色=只换色块参数</p>
+    </figure>
+  </section>
+
+  <section class="stage-row">
+    <div class="stage-card">
+      <figcaption>导出 SVG · fabric v7 toSVG（同对象，验证外部渲染器保真）</figcaption>
+      <div class="export-flex">
+        <div class="export-col">
+          <h4>A · 合成着色 → pattern 内嵌单图</h4>
+          <div id="svgA-preview" class="svg-preview"></div>
+        </div>
+        <div class="export-col">
+          <h4>B · 混合叠加 → 双层对象 gco</h4>
+          <div id="svgB-preview" class="svg-preview"></div>
+        </div>
+      </div>
+      <p class="cap" id="svg-note"></p>
+    </div>
+  </section>
+
+  <section class="stage-row">
+    <div class="stage-card">
+      <figcaption>缓存 / 内存估算（10 纹理 × 常用色池）</figcaption>
+      <table class="cmp">
+        <thead><tr><th></th><th>A 合成（每 色×纹理 一张位图）</th><th>B 叠加（灰纹 + 颜色参数）</th></tr></thead>
+        <tbody>
+          <tr><td>位图数</td><td id="memA-count">0</td><td id="memB-count">10</td></tr>
+          <tr><td>内存占用量</td><td id="memA-bytes">—</td><td id="memB-bytes">≈6 MB</td></tr>
+          <tr><td>改色路径</td><td>重合成（缓存命中则取缓存）</td><td>只改参数，GPU 即时</td></tr>
+          <tr><td>SVG 导出</td><td>pattern 内嵌带色 dataURL</td><td>依赖 gco / filter 导出保真（本页实测）</td></tr>
+          <tr><td>纹理缩放/旋转</td><td>合成时应用 → 契合 #12 预烘焙</td><td>走 patternTransform → 依赖 #12 补丁</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<script src="vendor/fabric.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
