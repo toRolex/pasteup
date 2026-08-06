@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>P0 验证：toSVG 对 pattern+图案变换的保真度 · prototype（一次性）</title>
+<style>
+  :root { --ink: #333; --muted: #888; --line: #ddd; --bg: #faf8f4; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.6 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; color: var(--ink); background: var(--bg); }
+  header { padding: 14px 20px; background: #fff; border-bottom: 1px solid var(--line); }
+  header h1 { margin: 0 0 4px; font-size: 17px; }
+  .proto-tag { color: #c0392b; font-size: 12px; font-weight: 600; }
+  .hint { color: var(--muted); font-size: 12px; margin: 0; }
+  .controls { padding: 12px 20px; background: #fff; border-bottom: 1px solid var(--line); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .controls button { padding: 6px 12px; border: 1px solid var(--line); border-radius: 6px; background: #fff; cursor: pointer; }
+  .controls button.active { background: #2c3e50; color: #fff; border-color: #2c3e50; }
+  .controls select, .controls input { padding: 5px 8px; border: 1px solid var(--line); border-radius: 6px; }
+  .rows { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; padding: 16px 20px; }
+  .cell { background: #fff; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .cell h3 { margin: 0; padding: 8px 12px; font-size: 13px; border-bottom: 1px solid var(--line); background: #f6f4ef; }
+  .cell h3 .sub { color: var(--muted); font-weight: 400; }
+  .stage { height: 420px; display: flex; align-items: center; justify-content: center; background: repeating-conic-gradient(#f0ede6 0 25%, #e9e5dc 0 50%) 0 0/24px 24px; }
+  .stage canvas, .stage img { max-width: 100%; max-height: 100%; box-shadow: 0 1px 4px rgba(0,0,0,.15); }
+  .checks { padding: 0 20px 16px; }
+  .checks .panel { background: #fff; border: 1px solid var(--line); border-radius: 8px; }
+  .checks h3 { margin: 0; padding: 8px 12px; font-size: 13px; border-bottom: 1px solid var(--line); background: #f6f4ef; }
+  .check-row { padding: 6px 12px; border-bottom: 1px dashed var(--line); font-size: 13px; }
+  .check-row:last-child { border-bottom: 0; }
+  .ok { color: #1e8449; font-weight: 600; }
+  .bad { color: #c0392b; font-weight: 600; }
+  .warn { color: #b9770e; font-weight: 600; }
+  pre { margin: 0; padding: 10px 12px; max-height: 260px; overflow: auto; font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; word-break: break-all; }
+  details { border-top: 1px solid var(--line); }
+  summary { padding: 8px 12px; cursor: pointer; font-size: 13px; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>P0 验证：<code>canvas.toSVG()</code> 对 pattern + 图案变换的保真度 <span class="proto-tag">PROTOTYPE — 一次性代码</span></h1>
+  <p class="hint">纸片（不规则闭合多边形）填充 pattern 纹理；验证导出 SVG 是否保留纹理自包含与 patternTransform（缩放/旋转）。左=画布基准，中=toSVG 原样，右=toSVG+patternTransform 补丁。</p>
+</header>
+
+<div class="controls">
+  <span>场景：</span>
+  <select id="scenario">
+    <option value="object">A · 仅对象变换（无 patternTransform）</option>
+    <option value="scale">B · patternTransform = scale(2)（纹理缩放）</option>
+    <option value="scale-rotate">C · patternTransform = scale(2)+rotate(30°)（缩放+旋转）</option>
+  </select>
+  <button id="export-btn">重新导出 SVG</button>
+  <button id="save-svg">下载 SVG 文件</button>
+  <label><input type="checkbox" id="patch-toggle" checked> 补丁：注入 patternTransform</label>
+</div>
+
+<div class="rows">
+  <div class="cell">
+    <h3>① 画布基准 <span class="sub">fabric canvas 实时渲染</span></h3>
+    <div class="stage"><div id="canvas-slot"></div></div>
+  </div>
+  <div class="cell">
+    <h3>② toSVG 原样 <span class="sub">浏览器按导出 SVG 渲染</span></h3>
+    <div class="stage"><div id="svg-slot"></div></div>
+  </div>
+  <div class="cell">
+    <h3>③ toSVG + 补丁 <span class="sub">注入 patternTransform</span></h3>
+    <div class="stage"><div id="patched-slot"></div></div>
+  </div>
+</div>
+
+<div class="checks">
+  <div class="panel">
+    <h3>程序化检查结果</h3>
+    <div id="verdict" style="padding:8px 12px;font-size:13px;border-bottom:1px dashed var(--line)"></div>
+    <div id="checks"></div>
+    <details>
+      <summary>SVG 源码（导出部分）</summary>
+      <pre id="svg-source"></pre>
+    </details>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "fabric": "https://cdn.jsdelivr.net/npm/fabric@7.4.0/dist/index.mjs"
+  }
+}
+</script>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
