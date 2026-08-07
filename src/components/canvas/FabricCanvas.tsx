@@ -7,10 +7,18 @@
  * - 不依赖 fabric `toObject()` 默认行为，schema 字段显式读写。
  */
 import { useEffect, useRef, type MutableRefObject } from 'react';
-import { Canvas, FabricImage } from 'fabric';
+import { Canvas, FabricImage, Path, type TPointerEventInfo } from 'fabric';
 import type { PaperProject } from '../../types/project';
 import { createFabricPath } from '../../fabric/paperFactory';
+import { pointsToOpenPath, tracePointsToPaper } from '../../fabric/traceTool';
 import { getZoom, panBy, resetViewport, zoomBy } from '../../fabric/viewport';
+
+/** 描摹笔迹（临时）：ink 墨色半透明，模拟手绘描线（DESIGN.md ink-line）。 */
+const TRACE_STROKE = 'rgba(90, 70, 52, 0.55)';
+const TRACE_STROKE_WIDTH = 3;
+
+/** 画布当前工具：select 默认选择/移动；trace 自由描绘。 */
+export type FabricTool = 'select' | 'trace';
 
 /** React→fabric 命令式导航句柄（只承载视口操作，不承载元素读写）。 */
 export interface FabricCanvasApi {
@@ -32,6 +40,8 @@ export interface FabricCanvasProps {
   onReady?: (canvas: Canvas) => void;
   /** 导航句柄（单向向下：React → fabric 视口；fabric 事件仍只经 onProjectChange 回灌）。 */
   apiRef?: MutableRefObject<FabricCanvasApi | null>;
+  /** 当前工具：trace 进入自由描绘（采点 → 自动闭合 → 纸片回灌）。 */
+  activeTool?: FabricTool;
 }
 
 /** 把 project.elements 命令式推送到 fabric 画布（单向向下）。 */
@@ -91,18 +101,29 @@ function readProjectFromCanvas(canvas: Canvas, previous: PaperProject): PaperPro
   };
 }
 
-export function FabricCanvas({ project, onProjectChange, onReady, apiRef }: FabricCanvasProps) {
+export function FabricCanvas({
+  project,
+  onProjectChange,
+  onReady,
+  apiRef,
+  activeTool = 'select',
+}: FabricCanvasProps) {
   const containerElRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<Canvas | null>(null);
   const projectRef = useRef(project);
   const onProjectChangeRef = useRef(onProjectChange);
   const onReadyRef = useRef(onReady);
   const apiRefRef = useRef(apiRef);
+  const activeToolRef = useRef(activeTool);
+  const pointsRef = useRef<{ x: number; y: number }[]>([]);
+  const tempPathRef = useRef<Path | null>(null);
+  const drawingRef = useRef(false);
 
   projectRef.current = project;
   onProjectChangeRef.current = onProjectChange;
   onReadyRef.current = onReady;
   apiRefRef.current = apiRef;
+  activeToolRef.current = activeTool;
 
   // 挂载：创建 fabric 画布并订阅事件（fabric 拥有画布内部状态）。
   // fabric v7 会把传入的 <canvas> 包进自建 wrapper，因此 React 只持有容器 div，
@@ -124,6 +145,62 @@ export function FabricCanvas({ project, onProjectChange, onReady, apiRef }: Fabr
       onProjectChangeRef.current?.(next);
     });
 
+    // 自由描绘（trace 工具）：pointer 采集 scenePoint，实时笔迹 + 松开自动闭合。
+    // 单向向上：闭合生成的纸片经 onProjectChange 回灌 store，不在 fabric 侧持有 React 状态。
+    const handleTraceDown = (e: TPointerEventInfo) => {
+      if (activeToolRef.current !== 'trace') return;
+      const p = e.scenePoint;
+      pointsRef.current = [{ x: p.x, y: p.y }];
+      const temp = new Path(pointsToOpenPath(pointsRef.current), {
+        fill: '',
+        stroke: TRACE_STROKE,
+        strokeWidth: TRACE_STROKE_WIDTH,
+        strokeLineCap: 'round',
+        strokeLineJoin: 'round',
+        selectable: false,
+        evented: false,
+      });
+      tempPathRef.current = temp;
+      drawingRef.current = true;
+      canvas.add(temp);
+      canvas.requestRenderAll();
+    };
+
+    const handleTraceMove = (e: TPointerEventInfo) => {
+      if (!drawingRef.current) return;
+      const p = e.scenePoint;
+      pointsRef.current.push({ x: p.x, y: p.y });
+      const temp = tempPathRef.current;
+      if (temp) {
+        // fabric v7 Path.path 是解析后的命令数组；用临时 Path 解析新 d 后整体替换
+        temp.path = new Path(pointsToOpenPath(pointsRef.current)).path;
+        temp.setCoords();
+      }
+      canvas.requestRenderAll();
+    };
+
+    const handleTraceUp = (e: TPointerEventInfo) => {
+      if (!drawingRef.current) return;
+      const p = e.scenePoint;
+      pointsRef.current.push({ x: p.x, y: p.y });
+      drawingRef.current = false;
+      if (tempPathRef.current) canvas.remove(tempPathRef.current);
+      tempPathRef.current = null;
+      const points = pointsRef.current;
+      pointsRef.current = [];
+      const paper = tracePointsToPaper(points);
+      const onProjectChange = onProjectChangeRef.current;
+      if (paper && onProjectChange) {
+        const current = projectRef.current;
+        onProjectChange({ ...current, elements: [...current.elements, paper] });
+      }
+      canvas.requestRenderAll();
+    };
+
+    canvas.on('mouse:down', handleTraceDown);
+    canvas.on('mouse:move', handleTraceMove);
+    canvas.on('mouse:up', handleTraceUp);
+
     // 导航句柄：仅承载视口操作（单向向下），fabric 事件仍只经 onProjectChange 回灌。
     const targetApiRef = apiRefRef.current;
     if (targetApiRef) {
@@ -144,6 +221,16 @@ export function FabricCanvas({ project, onProjectChange, onReady, apiRef }: Fabr
     };
     // 仅挂载时执行一次；fabric 画布生命周期由本壳持有
   }, []);
+
+  // 工具切换：trace 模式关闭对象选择（不选中既有纸片），光标改十字准星。
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const isTrace = activeTool === 'trace';
+    canvas.selection = !isTrace;
+    canvas.skipTargetFind = isTrace;
+    canvas.defaultCursor = isTrace ? 'crosshair' : 'default';
+  }, [activeTool]);
 
   // 单向向下：project 变化时推送 elements 到画布。
   useEffect(() => {

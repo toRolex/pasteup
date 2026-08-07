@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render, waitFor } from '@testing-library/react';
-import { Canvas, FabricImage } from 'fabric';
+import { Canvas, FabricImage, Point, type TPointerEventInfo } from 'fabric';
 import { FabricCanvas, type FabricCanvasApi } from './FabricCanvas';
 import {
   createEmptyProject,
@@ -131,5 +131,120 @@ describe('FabricCanvas 导航 API（seam S5）— apiRef 只改视口不动元�
 
     unmount();
     expect(apiRef.current).toBeNull();
+  });
+});
+
+describe('FabricCanvas 描摹（seam 5）— trace 工具：采点 → 自动闭合 → 纸片回灌', () => {
+  function pointerEvent(
+    x: number,
+    y: number,
+    extra: { alreadySelected?: boolean; isClick?: boolean } = {},
+  ): TPointerEventInfo {
+    return {
+      e: new MouseEvent('mousemove'),
+      scenePoint: new Point(x, y),
+      viewportPoint: new Point(x, y),
+      transform: null,
+      ...extra,
+    };
+  }
+
+  it('trace 模式下松开自动闭合生成纸片，经 onProjectChange 回灌且数组序为末尾（z 序）', () => {
+    let canvas: Canvas | undefined;
+    const onProjectChange = vi.fn();
+    const project = createEmptyProject(1200, 800);
+
+    render(
+      <FabricCanvas
+        project={project}
+        activeTool="trace"
+        onReady={(c) => { canvas = c; }}
+        onProjectChange={onProjectChange}
+      />,
+    );
+
+    canvas!.fire('mouse:down', { ...pointerEvent(10, 10), alreadySelected: false });
+    canvas!.fire('mouse:move', pointerEvent(60, 40));
+    canvas!.fire('mouse:move', pointerEvent(110, 70));
+    canvas!.fire('mouse:up', { ...pointerEvent(160, 120), isClick: false });
+
+    // 临时笔迹已移除，正式纸片回灌
+    expect(canvas!.getObjects()).toHaveLength(0);
+    expect(onProjectChange).toHaveBeenCalledTimes(1);
+    const next = onProjectChange.mock.calls[0][0] as PaperProject;
+    expect(next.elements).toHaveLength(1);
+    expect(next.elements[0].path.endsWith(' Z')).toBe(true);
+    expect(next.elements[0].color).toBe('#7A8B5C');
+    expect(next.elements[0].transform).toEqual({ x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1 });
+  });
+
+  it('trace 模式移动过程渲染临时笔迹，松开后移除不残留', () => {
+    let canvas: Canvas | undefined;
+    const project = createEmptyProject(1200, 800);
+
+    render(<FabricCanvas project={project} activeTool="trace" onReady={(c) => { canvas = c; }} />);
+
+    canvas!.fire('mouse:down', { ...pointerEvent(10, 10), alreadySelected: false });
+    canvas!.fire('mouse:move', pointerEvent(60, 40));
+    expect(canvas!.getObjects()).toHaveLength(1);
+
+    canvas!.fire('mouse:up', { ...pointerEvent(60, 40), isClick: false });
+    expect(canvas!.getObjects()).toHaveLength(0);
+  });
+
+  it('描点不足 3 个视为误触，不生成纸片', () => {
+    let canvas: Canvas | undefined;
+    const onProjectChange = vi.fn();
+    const project = createEmptyProject(1200, 800);
+
+    render(
+      <FabricCanvas
+        project={project}
+        activeTool="trace"
+        onReady={(c) => { canvas = c; }}
+        onProjectChange={onProjectChange}
+      />,
+    );
+
+    canvas!.fire('mouse:down', { ...pointerEvent(10, 10), alreadySelected: false });
+    canvas!.fire('mouse:up', { ...pointerEvent(12, 14), isClick: false });
+    expect(onProjectChange).not.toHaveBeenCalled();
+    expect(canvas!.getObjects()).toHaveLength(0);
+  });
+
+  it('select 模式下 pointer 事件不生成纸片', () => {
+    let canvas: Canvas | undefined;
+    const onProjectChange = vi.fn();
+    const project = createEmptyProject(1200, 800);
+
+    render(
+      <FabricCanvas
+        project={project}
+        activeTool="select"
+        onReady={(c) => { canvas = c; }}
+        onProjectChange={onProjectChange}
+      />,
+    );
+
+    canvas!.fire('mouse:down', { ...pointerEvent(10, 10), alreadySelected: false });
+    canvas!.fire('mouse:move', pointerEvent(60, 40));
+    canvas!.fire('mouse:up', { ...pointerEvent(160, 120), isClick: false });
+    expect(onProjectChange).not.toHaveBeenCalled();
+  });
+
+  it('trace 模式关闭对象选择（selection/skipTargetFind），切回 select 恢复', () => {
+    let canvas: Canvas | undefined;
+    const project = createEmptyProject(1200, 800);
+
+    const { rerender } = render(<FabricCanvas project={project} onReady={(c) => { canvas = c; }} />);
+    expect(canvas!.selection).toBe(true);
+
+    rerender(<FabricCanvas project={project} activeTool="trace" onReady={(c) => { canvas = c; }} />);
+    expect(canvas!.selection).toBe(false);
+    expect(canvas!.skipTargetFind).toBe(true);
+
+    rerender(<FabricCanvas project={project} activeTool="select" onReady={(c) => { canvas = c; }} />);
+    expect(canvas!.selection).toBe(true);
+    expect(canvas!.skipTargetFind).toBe(false);
   });
 });

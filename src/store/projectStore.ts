@@ -6,7 +6,12 @@
  * T4–T17 将在此 store 上持续扩展（底图 / 纸片数组 / 撤销栈等）。
  */
 import { create } from 'zustand';
-import { createEmptyProject, type PaperProject } from '../types/project';
+import {
+  createEmptyProject,
+  createPaperElement,
+  DEFAULT_PAPER_COLOR,
+  type PaperProject,
+} from '../types/project';
 import {
   createCanvasSize,
   DEFAULT_CANVAS_ORIENTATION,
@@ -24,6 +29,8 @@ export interface ProjectStore {
   setProject: (project: PaperProject) => void;
   /** 设置或清除底图照片。 */
   setBackgroundPhoto: (dataUrl: string | null) => void;
+  /** 追加一个描摹闭合的纸片到 elements 末尾（数组序即 z 序，后画在上层）。 */
+  addPaper: (path: string, color?: string) => void;
 }
 
 /** 按朝向 + 分辨率创建 A4 空项目。 */
@@ -48,5 +55,12 @@ export const useProjectStore = create<ProjectStore>()((set) => ({
   setBackgroundPhoto: (dataUrl) =>
     set((state) => ({
       project: { ...state.project, bgPhoto: dataUrl ? { dataUrl, visible: true } : null },
+    })),
+  addPaper: (path, color = DEFAULT_PAPER_COLOR) =>
+    set((state) => ({
+      project: {
+        ...state.project,
+        elements: [...state.project.elements, createPaperElement({ path, color })],
+      },
     })),
 }));

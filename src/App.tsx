@@ -1,5 +1,9 @@
 import { useRef, useState } from 'react';
-import { FabricCanvas, type FabricCanvasApi } from './components/canvas/FabricCanvas';
+import {
+  FabricCanvas,
+  type FabricCanvasApi,
+  type FabricTool,
+} from './components/canvas/FabricCanvas';
 import { NewProjectDialog } from './components/dialogs/NewProjectDialog';
 import { PalettePanel } from './components/panels/PalettePanel';
 import { useScreenPicker } from './picker/useScreenPicker';
@@ -14,6 +18,7 @@ export default function App() {
   const apiRef = useRef<FabricCanvasApi | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const { activate: activatePicker } = useScreenPicker();
+  const [tool, setTool] = useState<FabricTool>('select');
 
   return (
     <div className="app-shell">
@@ -36,6 +41,22 @@ export default function App() {
               onClick={() => activatePicker()}
             >
               取色
+            </button>
+            <button
+              className={`tool-btn${tool === 'select' ? ' tool-btn--active' : ''}`}
+              data-testid="tool-select"
+              aria-pressed={tool === 'select'}
+              onClick={() => setTool('select')}
+            >
+              选择
+            </button>
+            <button
+              className={`tool-btn${tool === 'trace' ? ' tool-btn--active' : ''}`}
+              data-testid="tool-trace"
+              aria-pressed={tool === 'trace'}
+              onClick={() => setTool('trace')}
+            >
+              描绘
             </button>
             <span className="brand-spacer" aria-hidden="true" />
             <button
@@ -110,7 +131,7 @@ export default function App() {
           </div>
         }
       >
-        <FabricCanvas project={project} onProjectChange={setProject} apiRef={apiRef} />
+        <FabricCanvas project={project} onProjectChange={setProject} apiRef={apiRef} activeTool={tool} />
       </JournalShell>
       <NewProjectDialog open={dialogOpen} onClose={() => setDialogOpen(false)} />
       <div className="grain" aria-hidden="true" />

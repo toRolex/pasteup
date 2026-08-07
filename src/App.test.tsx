@@ -59,4 +59,21 @@ describe('App 集成（seam S3）— 三栏骨架 + store 驱动的画布', () =
     expect(screen.getByTestId('zoom-out')).toBeInTheDocument();
     expect(screen.getByTestId('zoom-reset')).toBeInTheDocument();
   });
+
+  it('顶栏工具切换：选择/描绘互斥，激活态通过 aria-pressed 表达', () => {
+    render(<App />);
+    const selectBtn = screen.getByTestId('tool-select');
+    const traceBtn = screen.getByTestId('tool-trace');
+    expect(selectBtn).toHaveAttribute('aria-pressed', 'true'); // 默认选择工具
+    expect(traceBtn).toHaveAttribute('aria-pressed', 'false');
+
+    fireEvent.click(traceBtn);
+    expect(traceBtn).toHaveAttribute('aria-pressed', 'true');
+    expect(traceBtn).toHaveClass('tool-btn--active');
+    expect(selectBtn).toHaveAttribute('aria-pressed', 'false');
+
+    fireEvent.click(selectBtn);
+    expect(selectBtn).toHaveAttribute('aria-pressed', 'true');
+    expect(traceBtn).toHaveAttribute('aria-pressed', 'false');
+  });
 });

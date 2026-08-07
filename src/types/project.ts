@@ -35,6 +35,9 @@ export interface PaperTexture {
   dataUrl: string;
 }
 
+/** 新纸片默认色（T10 属性面板接入色板前写死；取 DESIGN.md 苔绿 moss）。 */
+export const DEFAULT_PAPER_COLOR = '#7A8B5C';
+
 /** 项目根对象：数组序即 z 序（elements 从底到顶）。 */
 export interface PaperProject {
   version: 1;
