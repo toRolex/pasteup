@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="icon" href="data:," />
+<title>guide · 05 墨与水彩 INK &amp; WATERCOLOR</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Liu+Jian+Mao+Cao&family=Ma+Shan+Zheng&family=Caveat:wght@400;600&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root { --paper:#F8F5EC; --ink:#2C2A26; --ink-soft:#5A5348; --indigo:#3B5B92; --vermilion:#C0392B; --gamboge:#E8B84B; --teal:#4A7C59; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:'Nunito','PingFang SC',sans-serif; font-size:14px; line-height:1.8; color:var(--ink);
+    background:linear-gradient(180deg,#F8F5EC 0%,#EFEADB 100%); min-height:100vh; }
+  .wrap { max-width:760px; margin:0 auto; padding:56px 28px 90px; }
+  .brand { font-family:'Caveat',cursive; font-size:24px; color:var(--teal); margin-bottom:40px; }
+  .brand a { color:var(--teal); text-decoration:none; }
+  h1 { font-family:'Liu Jian Mao Cao','Kaiti SC',cursive; font-weight:400; font-size:clamp(40px,6vw,56px); color:var(--indigo); margin-bottom:4px; letter-spacing:.04em; }
+  .sub { font-family:'Ma Shan Zheng','PingFang SC',sans-serif; font-size:19px; color:var(--vermilion); margin-bottom:34px; }
+  .block { background:rgba(248,245,236,.72); border-radius:3px; padding:26px 30px; margin-bottom:28px;
+    border:1px solid rgba(59,91,146,.10);
+    box-shadow:0 1px 0 rgba(59,91,146,.05);
+    position:relative; }
+  .block::before { content:''; position:absolute; top:-6px; right:10%; width:64px; height:10px; border-radius:50%;
+    background:rgba(232,184,75,.32); filter:blur(3px); }
+  .block h2 { font-family:'Liu Jian Mao Cao','Kaiti SC',cursive; font-weight:400; font-size:26px; color:var(--teal); margin-bottom:14px; letter-spacing:.03em; }
+  .block p { margin-bottom:10px; }
+  .block ul { padding-left:20px; }
+  .block li { margin-bottom:9px; }
+  code { font-family:'Nunito',monospace; font-size:12.5px; background:rgba(59,91,146,.10); padding:1px 6px; border-radius:4px; color:#2E4A78; }
+  pre { background:#2C2A26; color:#F8F5EC; border-radius:8px; padding:16px 18px; font-size:12.5px; line-height:1.6; overflow-x:auto; margin:10px 0; }
+  pre code { background:none; color:inherit; padding:0; }
+  .tag { display:inline-block; font-size:11px; font-weight:700; color:#F8F5EC; background:var(--indigo); border-radius:999px; padding:3px 10px; margin-right:6px; margin-bottom:6px; }
+  .back { display:inline-block; margin-top:8px; font-weight:700; color:var(--vermilion); text-decoration:none; }
+  .back:hover { text-decoration:underline; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand"><a href="../">← 墨与水彩</a></div>
+  <h1>墨与水彩</h1>
+  <div class="sub">INK &amp; WATERCOLOR · 湿纸上的构建记录</div>
+
+  <div class="block">
+    <h2>收到的 brief</h2>
+    <p>把 pasteup 做成一张湿润的水彩纸：纸片边缘有水彩晕染、墨色往纸里渗开，选中时颜色像刚滴上去还在流动，整个界面是水彩色卡+滴管+留白的画室。<span class="tag">水彩液体渲染</span><span class="tag">能力轴：水彩液体渲染</span></p>
+    <p><b>要 prove 的一件事</b>：水彩的边缘是活的——纸片不是硬边多边形而是「墨往纸里渗」的湿边缘，换色时像重新滴了一滴颜料，证明程序化水彩质感可达。</p>
+  </div>
+
+  <div class="block">
+    <h2>签名技法</h2>
+    <ul>
+      <li><b>canvas 水彩晕染算法</b>（手写，非贴图）：形状边缘沿法线随机偏移 120+ 采样点 + <code>softCircle</code> 径向羽化；边缘内侧叠 <code>darken(color,30)</code> 浓色积线复刻「颜料在纸边积住」；点内 240 个纤维噪点 + 3 层湿度 wash；湿/干两态。</li>
+      <li><b>SVG filter 湿边羽化</b>：<code>#wet-edge</code> 只位移 alpha 通道（feColorMatrix 提取 alpha → feDisplacementMap → feGaussianBlur → feComposite in），颜色原位，不产生透明黑边。</li>
+      <li><b>滴管取色动画</b>：取样涟漪 ring + 色板/HEX 同步。</li>
+      <li><b>颜色流动缓动</b>：4 条自定义 cubic-bezier + rAF 滴入插值，teardrop 沿曲线滴落、溅水珠 + 涟漪，undo 可退回。</li>
+      <li><b>留白构图</b>：画布左上大留白 + 两处批注（「水未干，慢慢来。」「let the paper breathe」）。</li>
+    </ul>
+  </div>
+
+  <div class="block">
+    <h2>真实代码摘录</h2>
+    <pre><code>// 边缘色积线：在形状内缘叠深色，复刻水彩"颜料在纸边积住"
+const edgeDark = darken(color, 30);
+for (let i = 0; i &lt; 120; i++) {
+  const a = rnd() * Math.PI * 2;
+  const bx = x + Math.cos(a) * R * (0.86 + rnd() * 0.1);
+  const by = y + Math.sin(a) * R * (0.86 + rnd() * 0.1);
+  softCircle(ctx, bx, by, R * 0.10, edgeDark, 0.5 + rnd() * 0.4);
+}</code></pre>
+  </div>
+
+  <div class="block">
+    <h2>资产来源</h2>
+    <p>零外部位图，水彩全部程序化生成。字体走 Google Fonts（Liu Jian Mao Cao / Ma Shan Zheng / Caveat / Nunito）。</p>
+  </div>
+
+  <div class="block">
+    <h2>批判循环发现与改动</h2>
+    <ul>
+      <li><b>纸片画布留余白</b>：形状只占画布中央 66%（<code>SHAPE_SCALE</code>），四周留给晕染渗出，否则 canvas 裁掉湿边。</li>
+      <li><b>最大坑：ring 的 fill 默认黑块</b>：非选中纸片的 <code>.ring</code> SVG 若不加 <code>opacity:0; fill:none; position:absolute</code>，circle 落 SVG UA 默认 fill:black，渲染成巨大黑块。</li>
+      <li><b>SVG 滤镜只动 alpha</b>：直接位移透明 canvas 会在边缘取样到透明黑产生暗晕，改 alpha-only + feComposite in 保留原色。</li>
+      <li><b>对比度</b>：--ink-faint 调至 #756B5D（4.79:1）。</li>
+    </ul>
+  </div>
+
+  <div class="block">
+    <h2>验证结果</h2>
+    <p>console errors：<b>0</b>（shot.js 复跑）。prove 断言（量化）：audit 量出三张纸片 halo 58/69/34px；像素采样见深色积线 (196,95,85) 与叶身 (235,202,193) 分层；放大远山右缘见 10+ 列羽化斜坡而非 1 列硬切。</p>
+    <p>截图：<code>shots/desktop-top/mid/bottom.png</code>、<code>shots/mobile-top/bottom.png</code>。自检工具 <code>review/audit.js</code> + <code>review/ascii.py</code>。</p>
+    <a class="back" href="../">回到原型 →</a>
+  </div>
+</div>
+</body>
+</html>

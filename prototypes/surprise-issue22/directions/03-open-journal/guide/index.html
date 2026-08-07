@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="icon" href="data:," />
+<title>guide · 03 摊开的手帐本 OPEN JOURNAL</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Liu+Jian+Mao+Cao&family=ZCOOL+KuaiLe&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root { --paper:#F7F0E0; --ink:#5A4634; --tape:#C0392B; --note:#E8C88A; --sticker:#8C6A92; --moss:#7A8B5C; --desk:#C9BCA6; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:'Nunito','PingFang SC',sans-serif; font-size:14px; line-height:1.8; color:var(--ink);
+    background:#C9BCA6;
+    background-image:radial-gradient(circle at 30% 20%, rgba(247,240,224,.7), transparent 60%), radial-gradient(circle at 70% 80%, rgba(247,240,224,.5), transparent 60%);
+    min-height:100vh; }
+  .wrap { max-width:780px; margin:0 auto; padding:48px 28px 90px; }
+  .brand { font-family:'Ma Shan Zheng','PingFang SC',sans-serif; font-size:20px; color:var(--ink); margin-bottom:36px; }
+  .brand a { color:var(--ink); text-decoration:none; }
+  h1 { font-family:'Ma Shan Zheng','PingFang SC',sans-serif; font-weight:400; font-size:clamp(34px,6vw,48px); color:var(--ink); margin-bottom:4px; letter-spacing:.02em; }
+  .sub { font-family:'Liu Jian Mao Cao','PingFang SC',cursive; font-size:22px; color:var(--tape); margin-bottom:30px; }
+  .block { background:var(--paper); border-radius:4px; padding:24px 26px; margin-bottom:26px;
+    box-shadow:0 4px 14px rgba(90,70,52,.22), 0 1px 2px rgba(90,70,52,.15);
+    position:relative; }
+  .block::before { content:''; position:absolute; top:-3px; left:50%; transform:translateX(-50%) rotate(0.6deg);
+    width:110px; height:26px; background:rgba(192,57,43,.78); opacity:.92;
+    clip-path:polygon(4px 0, calc(100% - 4px) 0, 100% 100%, 0 100%);
+    box-shadow:0 2px 3px rgba(90,70,52,.25); }
+  .block h2 { font-family:'Ma Shan Zheng','PingFang SC',sans-serif; font-weight:400; font-size:22px; color:var(--ink); margin-bottom:12px; }
+  .block p { margin-bottom:10px; }
+  .block ul { padding-left:20px; }
+  .block li { margin-bottom:8px; }
+  code { font-family:'Nunito',monospace; font-size:12.5px; background:rgba(90,70,52,.08); padding:1px 6px; border-radius:4px; }
+  pre { background:#3A3428; color:#F7F0E0; border-radius:4px; padding:16px 18px; font-size:12.5px; line-height:1.6; overflow-x:auto; margin:10px 0; }
+  pre code { background:none; color:inherit; padding:0; }
+  .tag { display:inline-block; font-size:11px; font-weight:700; color:#F7F0E0; background:var(--moss); border-radius:999px; padding:3px 10px; margin-right:6px; margin-bottom:6px; }
+  .back { display:inline-block; margin-top:8px; font-weight:700; color:var(--tape); text-decoration:none; }
+  .back:hover { text-decoration:underline; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand"><a href="../">← 摊开的手帐本</a></div>
+  <h1>摊开的手帐本</h1>
+  <div class="sub">OPEN JOURNAL · 怎么把它做出来的</div>
+
+  <div class="block">
+    <h2>收到的 brief</h2>
+    <p>整个 pasteup 界面就是一本摊开的手帐本：左栏是纸张上的手绘目录，右栏是贴纸与色卡，画布是中间的留白页，一切元素都用真实手写字体与胶带、便利贴材质表达。<span class="tag">排印拟物</span><span class="tag">能力轴：排印拟物</span></p>
+    <p><b>要 prove 的一件事</b>：一个工具界面可以完全不用「圆角卡片 + 阴影」的 UI 卡片，而用手帐纸面元素（胶带、贴纸、手写、圈注）承载同样的信息架构——排印与拟物达成真正的「手作感」。</p>
+  </div>
+
+  <div class="block">
+    <h2>签名技法</h2>
+    <ul>
+      <li><b>CSS 纸张纤维颗粒</b>：双层 SVG feTurbulence 噪点 data-URI 覆盖，<code>mix-blend-mode: multiply</code> 铺满整本，纸面有纤维感而非纯色。</li>
+      <li><b>胶带 / 便利贴 / 撕边拟物</b>：半透明朱红胶带（clip-path 锯齿端 + 透光边缘）、折角便利贴、苔绿纸片撕边票根、页角狗耳折痕。</li>
+      <li><b>手写体大标题 + 逐字浮现</b>：Ma Shan Zheng 主标题按字符 staggered 浮现，朱红手绘下划线 SVG <code>stroke-dashoffset</code> 后置描线。</li>
+      <li><b>手绘 SVG 箭头 / 圈注 / 涂鸦</b>：批注→枫叶的手绘箭头、选中纸片虚线圈、压花/螺旋/星星边角涂鸦。</li>
+      <li><b>纸页阴影层次</b>：书体大投影 + 双页内阴影 + 中缝装订虚线，摊开感来自阴影而非描边。</li>
+      <li><b>SVG 位移滤镜纸边</b>：枫叶用 feDisplacementMap 让边缘微毛边。</li>
+      <li><b>联动微交互</b>：色板着色、纹理改纸面、待办打勾、导出盖「已装订」朱红图章。</li>
+    </ul>
+  </div>
+
+  <div class="block">
+    <h2>真实代码摘录</h2>
+    <pre><code>/* 胶带：clip-path 锯齿端 + 半透明透光边缘 */
+.tape {
+  background: rgba(192, 57, 43, 0.78);
+  clip-path: polygon(
+    3% 0, 97% 4px, 100% 100%, 0 96%
+  );
+  -webkit-mask-image: radial-gradient(
+    rgba(0,0,0,0.9), rgba(0,0,0,0.35) 60%
+  );
+}</code></pre>
+  </div>
+
+  <div class="block">
+    <h2>资产来源</h2>
+    <p>零外部位图。纸张纤维为 SVG feTurbulence 程序生成；全部拟物元素为 CSS/SVG 手写；字体走 Google Fonts（Ma Shan Zheng / Liu Jian Mao Cao / ZCOOL KuaiLe / Nunito）。</p>
+  </div>
+
+  <div class="block">
+    <h2>批判循环发现与改动</h2>
+    <ul>
+      <li><b>双页摊开映射 IA</b>：左栏 260 = 目录页（手绘目录/工具/图层 + 回形针），右栏 280 = 色卡与属性便签，画布 = 留白页，中缝 34px 装订线，顶栏 56px 是裁纸 + 骑缝胶带。</li>
+      <li><b>纸片叙事</b>：拍立得底图（淡出作底，虚线描摹线）→ 朱红枫叶（描摹产物，带选中圈）→ 苔绿撕边票根（贴胶带）→ 淡紫贴纸。底注「今天描了这片枫叶」把操作写成手帐叙事。</li>
+      <li><b>布局 bug</b>：内联 SVG 滤镜占位把书体推下 16px → 修掉后 100vh 恰好填满视口。</li>
+      <li><b>对比度</b>：墨褐于纸面 ≈8.6:1，苔绿深底白字 ≈5:1，全 ≥4.5:1。</li>
+    </ul>
+  </div>
+
+  <div class="block">
+    <h2>验证结果</h2>
+    <p>console errors：<b>0</b>；docHeight 900 恰满视口；四族 Google Fonts 全部 loaded；390px 画布置顶无横向溢出；对比度全 ≥4.5:1；交互经 playwright 实测（着色/纹理/待办/图章）；prefers-reduced-motion 降级。</p>
+    <p>截图：<code>shots/desktop-top/mid/bottom.png</code>、<code>shots/mobile-top/bottom.png</code>。</p>
+    <a class="back" href="../">回到原型 →</a>
+  </div>
+</div>
+</body>
+</html>

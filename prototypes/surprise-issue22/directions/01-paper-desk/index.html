@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>纸间桌面 · pasteup 手帐剪纸拼贴</title>
+<meta name="description" content="纸间桌面 PAPER DESK — pasteup 手帐剪纸拼贴桌面 app 的三维纸桌视觉原型：纸片立在暖木桌上，有厚度、有光照、有投影。" />
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Nunito:wght@600;700;800&family=ZCOOL+KuaiLe&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- ============ 顶栏 56px ============ -->
+  <header class="topbar" role="banner">
+    <div class="topbar-left">
+      <a class="brand" href="#" aria-label="纸间桌面 回到项目首页">
+        <svg class="brand-mark" viewBox="0 0 28 28" aria-hidden="true">
+          <path d="M14 2.5 C6 2.5 2.5 7 2.5 14 S6 25.5 14 25.5 S25.5 21 25.5 14 S22 2.5 14 2.5 Z" fill="none" stroke="currentColor" stroke-width="2.2"/>
+          <path d="M6 21 L12.5 13.5 L17 17.5 L22 10.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="brand-name">纸间桌面</span>
+      </a>
+      <nav class="menus" aria-label="主菜单">
+        <button class="menu-btn" type="button">文件</button>
+        <button class="menu-btn" type="button">编辑</button>
+        <button class="menu-btn" type="button">视图</button>
+        <button class="menu-btn" type="button">拼贴</button>
+      </nav>
+    </div>
+    <div class="topbar-right">
+      <span class="save-state" role="status"><span class="save-dot" aria-hidden="true"></span>已保存 14:32</span>
+      <button class="btn btn-ghost" type="button">导出 SVG</button>
+      <button class="btn btn-primary" type="button">导出 PNG</button>
+    </div>
+  </header>
+
+  <div class="shell">
+
+    <!-- ============ 左栏 260px：文具盒 + 图层 ============ -->
+    <aside class="leftbar" aria-label="工具与图层">
+      <section class="panel tools-panel" aria-labelledby="tools-title">
+        <div class="panel-head">
+          <h2 class="panel-title caveat" id="tools-title">文具盒</h2>
+          <span class="panel-note">桌面工具</span>
+        </div>
+        <div class="tool-list" role="toolbar" aria-label="拼贴工具">
+          <button class="tool-item" data-tool="trace" type="button" aria-label="描摹工具 ⌘T" aria-pressed="false">
+            <span class="tool-ico" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M4 19.5c.3-1.2 1-2.1 2.2-2.6L18.6 4.6a2 2 0 0 1 2.8 2.8L9 19.8c-.9.6-2 .9-3.1.7L4 19.5z"/><path d="M16.5 6.5l1.4 1.4M6 17.5l3.5 3.5" opacity=".55"/></svg>
+            </span>
+            <span class="tool-name">描摹</span>
+            <span class="tool-kbd">⌘T</span>
+          </button>
+          <button class="tool-item is-active" data-tool="arrange" type="button" aria-label="拼贴工具 ⌘V" aria-pressed="true">
+            <span class="tool-ico" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M12 3.5 6 8.5h3v7H6l6 5 6-5h-3v-7h3l-6-5z" stroke-linejoin="round"/><circle cx="12" cy="12" r="2.1"/></svg>
+            </span>
+            <span class="tool-name">拼贴</span>
+            <span class="tool-kbd">⌘V</span>
+          </button>
+          <button class="tool-item" data-tool="paper" type="button" aria-label="纸片工具 ⌘P" aria-pressed="false">
+            <span class="tool-ico" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M4 8.2 8.6 4h7.4L20 8.2v9.2c0 1.4-1.2 2.6-2.6 2.6H6.6C5.2 20 4 18.8 4 17.4V8.2z"/><path d="M8.6 4v4.2H4M14 14.5l-2-2-2 2M12 12.5v5" stroke-linecap="round" stroke-linejoin="round" opacity=".55"/></svg>
+            </span>
+            <span class="tool-name">纸片</span>
+            <span class="tool-kbd">⌘P</span>
+          </button>
+          <button class="tool-item" data-tool="photo" type="button" aria-label="底图工具 ⌘U" aria-pressed="false">
+            <span class="tool-ico" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><rect x="3.5" y="6" width="17" height="12.5" rx="1.6"/><circle cx="9" cy="10.6" r="1.6"/><path d="m5.5 18.5 4.6-5 3.2 3.2 2.4-2.4 3.4 4.2" stroke-linecap="round" stroke-linejoin="round" opacity=".55"/></svg>
+            </span>
+            <span class="tool-name">底图</span>
+            <span class="tool-kbd">⌘U</span>
+          </button>
+          <button class="tool-item" data-tool="texture" type="button" aria-label="纹理工具 ⌘E" aria-pressed="false">
+            <span class="tool-ico" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M5 15.5 15.5 5a2.1 2.1 0 0 1 3 3L8 18.5l-4.5 1.5L5 15.5z"/><path d="M13 7l4 4M9.5 17.5l3-3M6.5 11l1.5-1.5" stroke-linecap="round" opacity=".55"/></svg>
+            </span>
+            <span class="tool-name">纹理</span>
+            <span class="tool-kbd">⌘E</span>
+          </button>
+          <button class="tool-item" data-tool="color" type="button" aria-label="着色工具 ⌘B" aria-pressed="false">
+            <span class="tool-ico" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M13.8 5.8 18 10l-8.4 8.4a3.2 3.2 0 0 1-4.5 0 3.2 3.2 0 0 1 0-4.5L13.8 5.8z"/><path d="M12 7l5 5M6.5 19.5 8 18" opacity=".55"/><circle cx="18.5" cy="16.5" r="1.4"/></svg>
+            </span>
+            <span class="tool-name">着色</span>
+            <span class="tool-kbd">⌘B</span>
+          </button>
+        </div>
+      </section>
+
+      <section class="panel layers-panel" aria-labelledby="layers-title">
+        <div class="panel-head">
+          <h2 class="panel-title caveat" id="layers-title">图层</h2>
+          <span class="panel-note">共 3 层</span>
+        </div>
+        <ul class="layer-list" role="list" aria-label="纸片图层">
+          <li class="layer-item is-active" data-layer="0" role="listitem" aria-selected="true">
+            <span class="layer-thumb" aria-hidden="true">
+              <svg viewBox="0 0 40 44"><path d="M20 5 C11 11 6.5 20 9 28 C11 35 17 39 20 39 C23 39 29 35 31 28 C33.5 20 29 11 20 5 Z" fill="#D68A55" stroke="#5A4634" stroke-width="1.6" stroke-linejoin="round"/></svg>
+            </span>
+            <span class="layer-meta">
+              <span class="layer-name">纸片·秋叶</span>
+              <span class="layer-sub">陶土 · 缩放 1.00</span>
+            </span>
+            <span class="layer-acts">
+              <button class="icon-btn" type="button" aria-label="隐藏 纸片·秋叶" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+              <button class="icon-btn" type="button" aria-label="锁定 纸片·秋叶" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5.5" y="10.5" width="13" height="9.5" rx="1.8"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/></svg></button>
+            </span>
+          </li>
+          <li class="layer-item" data-layer="1" role="listitem" aria-selected="false">
+            <span class="layer-thumb" aria-hidden="true">
+              <svg viewBox="0 0 40 44"><path d="M20 6 c9 2 14 8 14 15 -2 9 -8 14 -14 14 -8 -1 -14 -6 -14 -14 0 -7 5 -13 14 -15z M20 11 c5 1 8 5 8 9 -1 6 -4 9 -8 9 -5 0 -8 -3 -8 -9 0 -4 3 -8 8 -9z" fill="#7A8B5C" stroke="#5A4634" stroke-width="1.6" stroke-linejoin="round"/></svg>
+            </span>
+            <span class="layer-meta">
+              <span class="layer-name">纸片·苔痕</span>
+              <span class="layer-sub">苔绿 · 缩放 0.86</span>
+            </span>
+            <span class="layer-acts">
+              <button class="icon-btn" type="button" aria-label="隐藏 纸片·苔痕" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+              <button class="icon-btn" type="button" aria-label="锁定 纸片·苔痕" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5.5" y="10.5" width="13" height="9.5" rx="1.8"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/></svg></button>
+            </span>
+          </li>
+          <li class="layer-item" data-layer="2" role="listitem" aria-selected="false">
+            <span class="layer-thumb" aria-hidden="true">
+              <svg viewBox="0 0 40 44"><rect x="4" y="7" width="32" height="32" rx="3" fill="#F3E7D0" stroke="#5A4634" stroke-width="1.6"/><path d="M10 33l7-9 5 5 4-5 5 9H10z" fill="#8C5A2E" opacity=".8"/><circle cx="27" cy="13" r="2.6" fill="#D68A55" opacity=".8"/></svg>
+            </span>
+            <span class="layer-meta">
+              <span class="layer-name">底图·山影</span>
+              <span class="layer-sub">照片底图 · 100%</span>
+            </span>
+            <span class="layer-acts">
+              <button class="icon-btn" type="button" aria-label="隐藏 底图·山影" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+              <button class="icon-btn" type="button" aria-label="锁定 底图·山影" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5.5" y="10.5" width="13" height="9.5" rx="1.8"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/></svg></button>
+            </span>
+          </li>
+        </ul>
+        <button class="add-layer" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>
+          新建纸片
+        </button>
+      </section>
+
+      <p class="leftbar-hint">拖动纸片即是在桌面拼贴 · 纸片有真实厚度</p>
+    </aside>
+
+    <!-- ============ 中画布：三维纸桌 ============ -->
+    <main class="canvas-region" aria-label="三维纸桌画布">
+      <div id="scene" class="scene" role="application" aria-label="三维纸桌：纸片立在暖木桌上，可拖动拼贴"></div>
+      <p class="webgl-fallback" hidden>当前浏览器无法显示 3D 纸桌，请改用最新版 Chrome / Safari / Edge 体验。</p>
+
+      <div class="canvas-hud">
+        <div class="canvas-status" aria-hidden="true">
+          <span class="chip">画布 100%</span>
+          <span class="sep">·</span>
+          <span class="chip">纸片 ×2</span>
+          <span class="sep">·</span>
+          <span class="chip">底图 ×1</span>
+          <span class="chip is-accent" id="sel-label">选中：纸片·秋叶</span>
+        </div>
+        <div class="zoom-ctl" role="group" aria-label="画布缩放控制">
+          <button class="zoom-btn" type="button" aria-label="缩小" data-zoom="-1">−</button>
+          <button class="zoom-btn fit" type="button" aria-label="适应画布" data-zoom="0">适应</button>
+          <button class="zoom-btn" type="button" aria-label="放大" data-zoom="1">＋</button>
+        </div>
+      </div>
+
+      <div class="paper-tag" id="paper-tag" hidden aria-hidden="true">
+        <span class="pt-name" id="pt-name">纸片·秋叶</span>
+        <span class="pt-arrow" aria-hidden="true"></span>
+      </div>
+    </main>
+
+    <!-- ============ 右栏 280px：色板 / 纹理 / 属性 ============ -->
+    <aside class="rightbar" aria-label="色板与属性面板">
+      <div class="tabs" role="tablist" aria-label="属性面板切换">
+        <button class="tab is-active" id="tab-swatches" role="tab" aria-selected="true" aria-controls="panel-swatches" data-tab="swatches" type="button">色板</button>
+        <button class="tab" id="tab-textures" role="tab" aria-selected="false" aria-controls="panel-textures" data-tab="textures" type="button">纹理</button>
+        <button class="tab" id="tab-props" role="tab" aria-selected="false" aria-controls="panel-props" data-tab="props" type="button">属性</button>
+      </div>
+
+      <section class="tab-panel is-active" id="panel-swatches" data-panel="swatches" role="tabpanel" aria-labelledby="tab-swatches">
+        <h3 class="tab-title">纸片颜色</h3>
+        <div class="swatch-grid" role="group" aria-label="纸片色板">
+          <button class="swatch" data-color="#F3E7D0" data-name="暖纸" type="button" aria-label="暖纸 #F3E7D0" aria-pressed="false"><span class="swatch-chip" style="--c:#F3E7D0"></span><span class="swatch-name">暖纸</span></button>
+          <button class="swatch is-active" data-color="#D68A55" data-name="陶土" type="button" aria-label="陶土 #D68A55" aria-pressed="true"><span class="swatch-chip" style="--c:#D68A55"></span><span class="swatch-name">陶土</span></button>
+          <button class="swatch" data-color="#7A8B5C" data-name="苔绿" type="button" aria-label="苔绿 #7A8B5C" aria-pressed="false"><span class="swatch-chip" style="--c:#7A8B5C"></span><span class="swatch-name">苔绿</span></button>
+          <button class="swatch" data-color="#5A4634" data-name="墨褐" type="button" aria-label="墨褐 #5A4634" aria-pressed="false"><span class="swatch-chip" style="--c:#5A4634"></span><span class="swatch-name">墨褐</span></button>
+          <button class="swatch" data-color="#E8D5B0" data-name="高光" type="button" aria-label="高光 #E8D5B0" aria-pressed="false"><span class="swatch-chip" style="--c:#E8D5B0"></span><span class="swatch-name">高光</span></button>
+          <button class="swatch" data-color="#8C5A2E" data-name="木色" type="button" aria-label="木色 #8C5A2E" aria-pressed="false"><span class="swatch-chip" style="--c:#8C5A2E"></span><span class="swatch-name">木色</span></button>
+        </div>
+        <div class="custom-color">
+          <label class="cc-label" for="custom-color">自定</label>
+          <input type="color" id="custom-color" value="#D68A55" aria-label="自定义纸片颜色" />
+          <code class="cc-hex">#D68A55</code>
+        </div>
+        <div class="active-swatch-info">
+          <span class="asi-swatch" style="--c:#D68A55" aria-hidden="true"></span>
+          <span>当前纸片 <b>陶土</b></span>
+        </div>
+      </section>
+
+      <section class="tab-panel" id="panel-textures" data-panel="textures" role="tabpanel" aria-labelledby="tab-textures" hidden>
+        <h3 class="tab-title">纸片纹理</h3>
+        <p class="tab-caption">纹理决定纸面触感，实时映射到 3D 纸片。</p>
+        <div class="texture-grid" role="group" aria-label="纸片纹理">
+          <button class="texture-item is-active" data-texture="plain" type="button" aria-label="素纸纹理" aria-pressed="true"><canvas class="texture-canvas" data-tex="plain" width="84" height="64"></canvas><span class="texture-name">素纸</span></button>
+          <button class="texture-item" data-texture="grain" type="button" aria-label="颗粒纹理" aria-pressed="false"><canvas class="texture-canvas" data-tex="grain" width="84" height="64"></canvas><span class="texture-name">颗粒</span></button>
+          <button class="texture-item" data-texture="fiber" type="button" aria-label="纤维纹理" aria-pressed="false"><canvas class="texture-canvas" data-tex="fiber" width="84" height="64"></canvas><span class="texture-name">纤维</span></button>
+          <button class="texture-item" data-texture="wash" type="button" aria-label="水彩纹理" aria-pressed="false"><canvas class="texture-canvas" data-tex="wash" width="84" height="64"></canvas><span class="texture-name">水彩</span></button>
+          <button class="texture-item" data-texture="linen" type="button" aria-label="亚麻纹理" aria-pressed="false"><canvas class="texture-canvas" data-tex="linen" width="84" height="64"></canvas><span class="texture-name">亚麻</span></button>
+        </div>
+      </section>
+
+      <section class="tab-panel" id="panel-props" data-panel="props" role="tabpanel" aria-labelledby="tab-props" hidden>
+        <h3 class="tab-title">纸片属性</h3>
+        <div class="prop-group">
+          <div class="prop-row"><label for="prop-x">位置 X</label><input type="range" id="prop-x" min="-2.8" max="2.8" step="0.01" value="0.7" /><output for="prop-x">0.70</output></div>
+          <div class="prop-row"><label for="prop-y">位置 Y</label><input type="range" id="prop-y" min="-1.6" max="1.6" step="0.01" value="-0.3" /><output for="prop-y">-0.30</output></div>
+          <div class="prop-row"><label for="prop-rot">旋转</label><input type="range" id="prop-rot" min="-180" max="180" step="1" value="18" /><output for="prop-rot">18°</output></div>
+          <div class="prop-row"><label for="prop-scale">缩放</label><input type="range" id="prop-scale" min="0.4" max="1.6" step="0.01" value="1" /><output for="prop-scale">1.00</output></div>
+          <div class="prop-row"><label for="prop-opacity">不透明度</label><input type="range" id="prop-opacity" min="0.35" max="1" step="0.01" value="1" /><output for="prop-opacity">100%</output></div>
+          <div class="prop-row"><label for="prop-thickness">厚度</label><input type="range" id="prop-thickness" min="0.04" max="0.22" step="0.005" value="0.09" /><output for="prop-thickness">0.09</output></div>
+        </div>
+        <div class="prop-actions">
+          <button class="btn btn-ghost small" id="reset-props" type="button">回到默认</button>
+        </div>
+      </section>
+
+      <footer class="rightbar-foot">
+        <span>导出前请确认所有纸片已就位 · 项目 JSON 内嵌全部纹理</span>
+      </footer>
+    </aside>
+  </div>
+
+  <!-- ============ 移动端底部条（390px 布局不塌） ============ -->
+  <div class="mobile-bar" aria-label="移动端快捷工具">
+    <div class="mb-tools" role="toolbar" aria-label="移动端工具">
+      <button class="mb-tool is-active" data-tool="arrange" type="button" aria-label="拼贴"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 6 8.5h3v7H6l6 5 6-5h-3v-7h3l-6-5z"/><circle cx="12" cy="12" r="2.1"/></svg></button>
+      <button class="mb-tool" data-tool="paper" type="button" aria-label="纸片"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8.2 8.6 4h7.4L20 8.2v9.2c0 1.4-1.2 2.6-2.6 2.6H6.6C5.2 20 4 18.8 4 17.4V8.2z"/><path d="M8.6 4v4.2H4M14 14.5l-2-2-2 2M12 12.5v5"/></svg></button>
+      <button class="mb-tool" data-tool="trace" type="button" aria-label="描摹"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5c.3-1.2 1-2.1 2.2-2.6L18.6 4.6a2 2 0 0 1 2.8 2.8L9 19.8c-.9.6-2 .9-3.1.7L4 19.5z"/></svg></button>
+      <button class="mb-tool" data-tool="texture" type="button" aria-label="纹理"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 15.5 15.5 5a2.1 2.1 0 0 1 3 3L8 18.5l-4.5 1.5L5 15.5z"/></svg></button>
+    </div>
+    <div class="mb-colors" role="group" aria-label="移动端色板">
+      <button class="mb-color is-active" data-color="#D68A55" type="button" aria-label="陶土" style="--c:#D68A55"></button>
+      <button class="mb-color" data-color="#7A8B5C" type="button" aria-label="苔绿" style="--c:#7A8B5C"></button>
+      <button class="mb-color" data-color="#F3E7D0" type="button" aria-label="暖纸" style="--c:#F3E7D0"></button>
+      <button class="mb-color" data-color="#5A4634" type="button" aria-label="墨褐" style="--c:#5A4634"></button>
+      <button class="mb-color" data-color="#E8D5B0" type="button" aria-label="高光" style="--c:#E8D5B0"></button>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/CustomEase.min.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+# surprise-me publish root — the gallery lives at the site root.
+[build]
+  publish = "."
+
+# Generated thumbnails + static media: long-lived, never mutate in place
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# QA screenshots referenced by guides: a day-long cache is fine
+[[headers]]
+  for = "/shots/*"
+  [headers.values]
+    Cache-Control = "public, max-age=86400"
+
+# Sites are fully static HTML — let shared libraries revalidate quickly
+[[headers]]
+  for = "/**/*.js"
+  [headers.values]
+    Cache-Control = "public, max-age=3600, stale-while-revalidate=86400"
+
+[[headers]]
+  for = "/**/*.css"
+  [headers.values]
+    Cache-Control = "public, max-age=3600, stale-while-revalidate=86400"

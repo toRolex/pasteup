@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>pasteup · 6 个 UI 视觉方向</title>
+<meta name="description" content="pasteup 手帐剪纸拼贴桌面 app（issue #22）的 6 个 UI 视觉方向原型：实时 3D / canvas 程序纹理 / 排印拟物 / 粒子物理 / 水彩液体渲染 / 暗色光照叙事。" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%237A8B5C'/%3E%3Cpath d='M4 11l3-4 2 2 3-5' fill='none' stroke='%23F8F8F2' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Nunito:wght@400;600;700;800&family=ZCOOL+KuaiLe&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #F0E8D7;
+    --surface: #F7F0E0;
+    --surface-2: #EFE6D2;
+    --ink: #5A4634;
+    --ink-muted: #8A755E;
+    --primary: #7A8B5C;
+    --accent: #A8845A;
+    --edge: #E0D3B5;
+    --shadow-2: 0 2px 6px rgba(90, 70, 52, 0.08), 0 1px 2px rgba(90, 70, 52, 0.05);
+    --shadow-3: 0 6px 16px rgba(90, 70, 52, 0.10), 0 2px 4px rgba(90, 70, 52, 0.06);
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+    --font-display: 'Caveat', 'ZCOOL KuaiLe', cursive;
+    --font-body: 'Nunito', 'PingFang SC', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: var(--font-body);
+    font-size: 14px;
+    color: var(--ink);
+    background: var(--bg);
+    background-image:
+      radial-gradient(circle at 12% 6%, rgba(168, 132, 90, 0.05), transparent 36%),
+      radial-gradient(circle at 88% 92%, rgba(122, 139, 92, 0.05), transparent 36%);
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 0 28px; }
+
+  header {
+    padding: 26px 0 6px;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .brand { font-family: var(--font-display); font-size: 30px; font-weight: 700; letter-spacing: -0.02em; }
+  .brand small { font-family: var(--font-body); font-size: 12px; font-weight: 700; color: var(--primary); letter-spacing: 0.04em; text-transform: uppercase; margin-left: 8px; }
+  .tag { font-size: 12px; color: var(--ink-muted); font-weight: 600; }
+  .tag b { color: var(--ink); }
+
+  .hero { padding: 44px 0 34px; max-width: 760px; }
+  .hero h1 {
+    font-family: var(--font-display);
+    font-size: clamp(40px, 6vw, 64px);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.08;
+    margin-bottom: 18px;
+  }
+  .hero h1 em { font-style: normal; color: var(--primary); }
+  .hero p { font-size: 16px; line-height: 1.7; color: var(--ink-muted); }
+  .hero .axis {
+    margin-top: 22px; display: flex; flex-wrap: wrap; gap: 8px;
+  }
+  .axis span {
+    font-size: 12px; font-weight: 700; color: var(--ink);
+    background: var(--surface); border: 1px solid var(--edge);
+    border-radius: 999px; padding: 5px 12px;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    padding: 6px 0 40px;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--edge);
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: var(--shadow-2);
+    display: flex; flex-direction: column;
+    transition: transform 400ms var(--ease), box-shadow 400ms var(--ease);
+  }
+  .card:hover { transform: translateY(-4px); box-shadow: var(--shadow-3); }
+  .thumb { position: relative; aspect-ratio: 16 / 10; overflow: hidden; }
+  .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 600ms var(--ease); }
+  .card:hover .thumb img { transform: scale(1.04); }
+  .axis-badge {
+    position: absolute; top: 12px; left: 12px;
+    font-size: 11px; font-weight: 800; color: #fff;
+    background: rgba(58, 46, 34, 0.78);
+    border-radius: 999px; padding: 4px 10px;
+    backdrop-filter: blur(2px);
+  }
+  .card-body { padding: 16px 18px 18px; display: flex; flex-direction: column; flex: 1; }
+  .num { font-family: var(--font-display); font-size: 15px; color: var(--accent); font-weight: 700; }
+  .card h2 {
+    font-family: var(--font-display);
+    font-size: 24px; font-weight: 700; letter-spacing: -0.01em;
+    margin: 4px 0 8px;
+  }
+  .card h2 span { color: var(--ink-muted); font-size: 14px; margin-left: 6px; font-weight: 600; }
+  .card p { font-size: 13px; line-height: 1.65; color: var(--ink-muted); flex: 1; }
+  .links { display: flex; gap: 8px; margin-top: 16px; }
+  .links a {
+    font-size: 12px; font-weight: 700; text-decoration: none;
+    padding: 7px 14px; border-radius: 999px; transition: all 300ms var(--ease);
+  }
+  .links a.demo { background: var(--primary); color: #F8F8F2; }
+  .links a.demo:hover { background: #6B7B4F; transform: translateY(-1px); }
+  .links a.guide { background: transparent; color: var(--ink); border: 1px solid var(--edge); }
+  .links a.guide:hover { background: var(--surface-2); }
+
+  footer {
+    border-top: 1px solid var(--edge);
+    padding: 28px 0 48px;
+    display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+    font-size: 12px; color: var(--ink-muted); line-height: 1.7;
+  }
+  footer .how {
+    font-size: 12px; color: var(--ink); font-weight: 700;
+  }
+
+  @media (max-width: 960px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 640px) {
+    .grid { grid-template-columns: 1fr; }
+    .hero { padding-top: 30px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition-duration: 0.001ms !important; animation-duration: 0.001ms !important; }
+    .card:hover { transform: none; }
+    .card:hover .thumb img { transform: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">pasteup<small>issue #22 · MVP</small></div>
+    <div class="tag"><b>6 个 UI 视觉方向</b> · 手帐剪纸拼贴桌面 app</div>
+  </header>
+
+  <section class="hero">
+    <h1>同一副纸桌，<em>六种剪纸。</em></h1>
+    <p>pasteup 把「剪纸 + 拼贴」从实物搬到屏幕：在照片上描轮廓，程序生成带彩纸纹理的「纸片」，拼贴排版后导出 PNG / SVG。这里并排摆出 6 个本质不同的 UI 视觉方向。每个占一个能力轴，各自是不同的纸。</p>
+    <div class="axis">
+      <span>实时 3D</span><span>canvas 程序纹理</span><span>排印拟物</span>
+      <span>粒子物理</span><span>水彩液体渲染</span><span>暗色光照叙事</span>
+    </div>
+  </section>
+
+  <section class="grid">
+
+    <article class="card">
+      <div class="thumb"><span class="axis-badge">实时 3D</span><img src="assets/thumbs/01-paper-desk.jpg" alt="纸间桌面 3D 纸桌预览" loading="lazy" /></div>
+      <div class="card-body">
+        <div class="num">01</div>
+        <h2>纸间桌面 <span>PAPER DESK</span></h2>
+        <p>把画布变成真实的三维纸桌。纸片立在暖木桌上，有厚度、有光照、有投影，拖动时像被手拿起来。</p>
+        <div class="links"><a class="demo" href="directions/01-paper-desk/">看原型</a><a class="guide" href="directions/01-paper-desk/guide/">how it was built →</a></div>
+      </div>
+    </article>
+
+    <article class="card">
+      <div class="thumb"><span class="axis-badge">canvas 程序纹理</span><img src="assets/thumbs/02-lab-paper.jpg" alt="活纹理实验室预览" loading="lazy" /></div>
+      <div class="card-body">
+        <div class="num">02</div>
+        <h2>活纹理 <span>LAB PAPER</span></h2>
+        <p>6 种程序纹理（褶皱/水彩/颗粒/拉丝/大理石/纤维）全部 canvas 实时生成，seed 驱动随机：结构随机、颜色稳定。</p>
+        <div class="links"><a class="demo" href="directions/02-lab-paper/">看原型</a><a class="guide" href="directions/02-lab-paper/guide/">how it was built →</a></div>
+      </div>
+    </article>
+
+    <article class="card">
+      <div class="thumb"><span class="axis-badge">排印拟物</span><img src="assets/thumbs/03-open-journal.jpg" alt="摊开的手帐本预览" loading="lazy" /></div>
+      <div class="card-body">
+        <div class="num">03</div>
+        <h2>摊开的手帐本 <span>OPEN JOURNAL</span></h2>
+        <p>整个界面是一本摊开的手帐本：零 UI 卡片，信息架构全靠胶带、便利贴、手写与圈注承载。</p>
+        <div class="links"><a class="demo" href="directions/03-open-journal/">看原型</a><a class="guide" href="directions/03-open-journal/guide/">how it was built →</a></div>
+      </div>
+    </article>
+
+    <article class="card">
+      <div class="thumb"><span class="axis-badge">粒子物理</span><img src="assets/thumbs/04-scrap-motion.jpg" alt="碎纸拼贴粒子预览" loading="lazy" /></div>
+      <div class="card-body">
+        <div class="num">04</div>
+        <h2>碎纸拼贴 <span>SCRAP MOTION</span></h2>
+        <p>纸片的生命由碎纸粒子构成。拖动时解构成纸屑云、飘散、再重组回纸片，拼贴过程本身会动。</p>
+        <div class="links"><a class="demo" href="directions/04-scrap-motion/">看原型</a><a class="guide" href="directions/04-scrap-motion/guide/">how it was built →</a></div>
+      </div>
+    </article>
+
+    <article class="card">
+      <div class="thumb"><span class="axis-badge">水彩液体渲染</span><img src="assets/thumbs/05-ink-watercolor.jpg" alt="墨与水彩预览" loading="lazy" /></div>
+      <div class="card-body">
+        <div class="num">05</div>
+        <h2>墨与水彩 <span>INK &amp; WATERCOLOR</span></h2>
+        <p>把 pasteup 做成一张湿润的水彩纸：纸片边缘是活的，墨往纸里渗；换色时像重新滴了一滴颜料。</p>
+        <div class="links"><a class="demo" href="directions/05-ink-watercolor/">看原型</a><a class="guide" href="directions/05-ink-watercolor/guide/">how it was built →</a></div>
+      </div>
+    </article>
+
+    <article class="card">
+      <div class="thumb"><span class="axis-badge">暗色光照叙事</span><img src="assets/thumbs/06-night-desk.jpg" alt="深夜拼贴桌预览" loading="lazy" /></div>
+      <div class="card-body">
+        <div class="num">06</div>
+        <h2>深夜拼贴桌 <span>NIGHT DESK</span></h2>
+        <p>深夜咖啡馆的一张小桌，一盏暖台灯打出一圈光锥。纸片在光里发亮、在暗处沉静，暗色不刺眼。</p>
+        <div class="links"><a class="demo" href="directions/06-night-desk/">看原型</a><a class="guide" href="directions/06-night-desk/guide/">how it was built →</a></div>
+      </div>
+    </article>
+
+  </section>
+
+  <footer>
+    <div class="how">每个方向自带 guide，记录收到的 brief、签名技法与批判循环发现。</div>
+    <div>6 directions · 6 capability axes · 0 console errors</div>
+  </footer>
+</div>
+</body>
+</html>

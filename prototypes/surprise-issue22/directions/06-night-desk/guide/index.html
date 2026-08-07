@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="icon" href="data:," />
+<title>guide · 06 深夜拼贴桌 NIGHT DESK</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=ZCOOL+KuaiLe&family=Nunito:wght@400;600&display=swap" rel="stylesheet" />
+<style>
+  :root { --desk:#2B241C; --desk-deep:#1E1912; --desk-raised:#352B20; --lamp:#FFD28A; --lamp-dim:#B98A52; --oldpaper:#C98A4B; --moss:#7A8B5C; --paperlight:#E8D5B0; --text-hi:#F0E1BC; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:'Nunito','PingFang SC',sans-serif; font-size:14px; line-height:1.8; color:var(--paperlight);
+    background:radial-gradient(ellipse 70% 90% at 62% 38%, #352B20 0%, #2B241C 55%, #1E1912 100%); min-height:100vh; }
+  .wrap { max-width:760px; margin:0 auto; padding:48px 28px 80px; }
+  .brand { font-family:'Caveat',cursive; font-size:22px; font-weight:700; color:var(--lamp-dim); margin-bottom:36px; }
+  .brand a { color:var(--lamp-dim); text-decoration:none; }
+  h1 { font-family:'ZCOOL KuaiLe','Caveat',sans-serif; font-size:clamp(28px,5vw,42px); font-weight:400; color:var(--lamp); margin-bottom:6px; letter-spacing:.01em; }
+  .sub { font-family:'Caveat',cursive; font-size:19px; color:var(--oldpaper); margin-bottom:30px; }
+  .block { background:rgba(46,38,28,.72); border:1px solid rgba(255,210,138,.14); border-radius:10px; padding:22px 24px; margin-bottom:22px; }
+  .block h2 { font-family:'Caveat',cursive; font-size:22px; font-weight:700; color:var(--lamp); margin-bottom:12px; }
+  .block p { margin-bottom:10px; }
+  .block ul { padding-left:20px; }
+  .block li { margin-bottom:8px; }
+  code { font-family:'Nunito',monospace; font-size:12.5px; background:rgba(255,210,138,.12); padding:1px 6px; border-radius:5px; color:#FFD28A; }
+  pre { background:#1E1912; color:#F0E1BC; border-radius:10px; padding:16px 18px; font-size:12.5px; line-height:1.6; overflow-x:auto; margin:10px 0; border:1px solid rgba(255,210,138,.10); }
+  pre code { background:none; color:inherit; padding:0; }
+  .tag { display:inline-block; font-size:11px; font-weight:700; color:#1E1912; background:var(--lamp); border-radius:999px; padding:3px 10px; margin-right:6px; margin-bottom:6px; }
+  .back { display:inline-block; margin-top:8px; font-weight:700; color:var(--lamp); text-decoration:none; }
+  .back:hover { text-decoration:underline; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand"><a href="../">← 深夜拼贴桌</a></div>
+  <h1>深夜拼贴桌 · NIGHT DESK</h1>
+  <div class="sub">how it was built — 台灯下的构建记录</div>
+
+  <div class="block">
+    <h2>收到的 brief</h2>
+    <p>把 pasteup 场景放到深夜咖啡馆的一张小桌：桌面深木色，一盏暖台灯打出一圈光锥，纸片在光里发亮、在暗处沉静，界面是暗色但绝不刺眼。<span class="tag">暗色光照叙事</span><span class="tag">能力轴：暗色光照叙事（6 方向唯一深色）</span></p>
+    <p><b>要 prove 的一件事</b>：暗色 ≠ 刺眼，反而更能烘托纸质感。台灯光锥内的纸片像被真实照亮，「纸感」由光照方向而非材质堆砌达成。</p>
+  </div>
+
+  <div class="block">
+    <h2>签名技法</h2>
+    <ul>
+      <li><b>径向光锥 overlay</b>：<code>mix-blend-mode: screen</code> 暖光径向渐变照明层 + 6.5s 自定义缓动「呼吸」。</li>
+      <li><b>纸片光照响应</b>：每张纸片按与光源距离经 smoothstep 算出 <code>--lit</code>，实时合成 brightness + 贴形 drop-shadow 暖光；拖拽纸片进出光锥实时亮/暗。</li>
+      <li><b>暗色对比布局</b>：深夜桌 #2B241C 底 + 台灯暖光 #FFD28A 高对比叙事。</li>
+      <li><b>台灯开关微交互</b>：顶栏开关 + 点击画布灯头；关灯光锥淡出、灯头垂下、纸片沉入夜色。</li>
+      <li><b>柔边投影</b>：<code>drop-shadow(0 18px 16px rgba(0,0,0,.55))</code> 宽模糊落影贴合纸片形状。</li>
+      <li><b>程序纹理与资产</b>：纸片纹理 = SVG feTurbulence 噪点；夜景照片 = canvas 运行时生成（夜空/星/月/远山/湖面反光）。</li>
+      <li><b>桌面杂物 marginalia</b>：铅笔 + 咖啡渍 + 两枚 Caveat 手写便利贴。</li>
+    </ul>
+  </div>
+
+  <div class="block">
+    <h2>真实代码摘录</h2>
+    <pre><code>// smoothstep：光随纸片到光源距离平滑衰减
+const d = dist(piece, lampCenter) / maxR;
+const t = clamp(d, 0, 1);
+let lit = t * t * (3 - 2 * t);        // smoothstep 缓动
+lit = 1 - lit;                          // 近光则亮
+if (!lampOn) lit *= 0.32;               // 关灯沉入夜色
+p.style.setProperty("--lit", lit.toFixed(3));</code></pre>
+  </div>
+
+  <div class="block">
+    <h2>资产来源</h2>
+    <p>零外部位图。纸纹 SVG feTurbulence 生成，夜景照片 canvas 运行时生成；字体走 Google Fonts（Caveat / ZCOOL KuaiLe / Nunito）。</p>
+  </div>
+
+  <div class="block">
+    <h2>批判循环发现与改动</h2>
+    <ul>
+      <li><b>信息架构严格不动</b>：顶栏 56px + 左栏 260px（工具+图层）+ 中画布 + 右栏 280px（色板/纹理/属性）。</li>
+      <li><b>光照响应引擎对齐光锥落点</b>：光源取径向渐变最亮带（0.36 × 画布高），与纸片中心同坐标系，保证「灯下的叶最亮、光缘的月次之、暗处沉」。</li>
+      <li><b>滑块真实驱动</b>：右栏旋转/透明度/明度滑块与画布联动，是「活界面」不是死样机。</li>
+      <li><b>对比度实测</b>：面板标题 4.9:1、次级文字 5.6:1、主文字 10.1:1；票据手写字加深墨色、票纸提亮至 #C08A4E 满足 4.5:1。</li>
+    </ul>
+  </div>
+
+  <div class="block">
+    <h2>验证结果</h2>
+    <p>console errors：<b>0</b>（shot.js 多轮截图）。prove 断言（像素亮度）：光锥最亮带 L≈157 → 灯下枫叶 L≈142 → 光缘月 L≈107 → 暗处票据 L≈68 → 深影宝丽来 L≈19；关灯后枫叶 142→47，界面其余保持可读。</p>
+    <p>截图：<code>shots/desktop-top/mid/bottom.png</code>、<code>shots/mobile-top/bottom.png</code>、<code>shots/desktop-lamp-on/off.png</code>。</p>
+    <a class="back" href="../">回到原型 →</a>
+  </div>
+</div>
+</body>
+</html>

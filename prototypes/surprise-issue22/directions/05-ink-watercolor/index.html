@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>pasteup · 05 墨与水彩</title>
+<meta name="description" content="pasteup 手帐剪纸拼贴 app 的墨与水彩视觉方向原型——湿纸、晕染、滴入。让纸片像水彩一样往纸里渗。" />
+<link rel="icon" href="data:," />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;600&family=Liu+Jian+Mao+Cao&family=Ma+Shan+Zheng&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<!-- SVG 湿边滤镜：只位移 alpha 通道（颜色原位），再做羽化——避免透明黑边 -->
+<svg class="svg-defs" aria-hidden="true" focusable="false">
+  <defs>
+    <filter id="wet-edge" x="-25%" y="-25%" width="150%" height="150%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.012 0.02" numOctaves="2" seed="17" result="noise" />
+      <feColorMatrix in="SourceGraphic" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="a" />
+      <feDisplacementMap in="a" in2="noise" scale="13" xChannelSelector="R" yChannelSelector="G" result="a-wobble" />
+      <feGaussianBlur in="a-wobble" stdDeviation="0.8" result="a-feather" />
+      <feComposite in="SourceGraphic" in2="a-feather" operator="in" />
+    </filter>
+    <filter id="wet-edge-soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.02 0.025" numOctaves="2" seed="5" result="noise" />
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="4" xChannelSelector="R" yChannelSelector="G" result="wobble" />
+      <feGaussianBlur in="wobble" stdDeviation="0.3" />
+    </filter>
+  </defs>
+</svg>
+
+<div class="app">
+
+  <!-- ── 顶栏 56px ─────────────────────────── -->
+  <header class="topbar">
+    <div class="brand">
+      <svg class="brand-drop" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 3c1.8 0 3 1 3 2.2 0 2.4-3 4.2-3 7.3 0-3.1-3-4.9-3-7.3C9 4 10.2 3 12 3z" fill="currentColor" />
+        <path d="M12 19c1.6 0 3-1.2 3-2.8 0-1.6-3-3.4-3-5.6 0 2.2-3 4-3 5.6C9 17.8 10.4 19 12 19z" fill="currentColor" opacity=".45" />
+      </svg>
+      <div class="brand-text">
+        <span class="brand-name">pasteup</span>
+        <span class="brand-sub">墨与水彩 · 湿纸画室</span>
+      </div>
+    </div>
+
+    <div class="topbar-mid" role="group" aria-label="编辑控制">
+      <button class="icon-btn" id="btnUndo" aria-label="撤销" title="撤销">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7 4 12l5 5M4 12h10a6 6 0 0 1 6 6" /></svg>
+      </button>
+      <button class="icon-btn" id="btnRedo" aria-label="重做" title="重做">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 7 5 5-5 5M20 12H10a6 6 0 0 0-6 6" /></svg>
+      </button>
+      <span class="divider" aria-hidden="true"></span>
+      <button class="icon-btn" id="btnZoomOut" aria-label="缩小" title="缩小">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M16.5 16.5 21 21M8 11h6" /></svg>
+      </button>
+      <span class="zoom-read" id="zoomRead" aria-live="polite">100%</span>
+      <button class="icon-btn" id="btnZoomIn" aria-label="放大" title="放大">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M16.5 16.5 21 21M8 11h6M11 8v6" /></svg>
+      </button>
+    </div>
+
+    <div class="topbar-right">
+      <button class="btn-export" id="btnExport" aria-label="导出作品为 PNG">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11M8 10l4 4 4-4M4 19h16" /></svg>
+        <span>导出 PNG</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ── 主体三栏 ──────────────────────────── -->
+  <div class="shell">
+
+    <!-- 左栏 260px：工具 + 图层 -->
+    <aside class="rail rail-left" aria-label="工具与图层">
+      <section class="panel tools-panel">
+        <h2 class="panel-title"><span class="wet-dot" aria-hidden="true"></span>工具</h2>
+        <div class="tool-grid" id="toolBar" role="toolbar" aria-label="画具">
+          <button class="tool" data-tool="select" aria-pressed="true" aria-label="选择工具">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3l13 7.5-6 1.4 2.6 6.3-2.3 1L9.4 13 5 17z" /></svg>
+            <span>选择</span>
+          </button>
+          <button class="tool" data-tool="trace" aria-pressed="false" aria-label="描摹工具">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l1.2-4.4L16.5 4.3a2 2 0 0 1 2.8 0l.4.4a2 2 0 0 1 0 2.8L8.4 18.8z" /><path d="M14.5 6.3l3.2 3.2" /></svg>
+            <span>描摹</span>
+          </button>
+          <button class="tool" data-tool="piece" aria-pressed="false" aria-label="纸片工具">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5c3.6 0 6.2 2 6.2 4.9 0 2-1 3.7-2.6 4.8-1.7 1.2-2 2.9-3.6 2.9s-1.9-1.7-3.6-2.9C7.8 12.1 6.8 10.4 6.8 8.4c0-2.9 2.6-4.9 5.2-4.9z" /></svg>
+            <span>纸片</span>
+          </button>
+          <button class="tool" data-tool="dropper" aria-pressed="false" aria-label="取色工具">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 3.5 20.5 8.5l-2 2-5-5z" /><path d="M13 6.5 4 15.5V20h4.5l9-9" /><path d="M10.5 9l4.5 4.5" /></svg>
+            <span>取色</span>
+          </button>
+          <button class="tool" data-tool="eraser" aria-pressed="false" aria-label="橡皮工具">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 17 4.7 13.7a2 2 0 0 1 0-2.8l5-5a2 2 0 0 1 2.8 0L18 11.3a2 2 0 0 1 0 2.8L13 19H8z" /><path d="M6.5 21h11" /></svg>
+            <span>橡皮</span>
+          </button>
+          <button class="tool" data-tool="hand" aria-pressed="false" aria-label="抓手工具">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 12V6.5a1.5 1.5 0 0 1 3 0V11M11 11V5a1.5 1.5 0 0 1 3 0v6M14 11V6.5a1.5 1.5 0 0 1 3 0v6.5a5.5 5.5 0 0 1-5.5 5.5H11a5 5 0 0 1-4-2L4.5 13a1.5 1.5 0 0 1 2.4-1.8L8 12.5" /></svg>
+            <span>抓手</span>
+          </button>
+        </div>
+      </section>
+
+      <section class="panel layers-panel">
+        <div class="panel-head">
+          <h2 class="panel-title"><span class="wet-dot" aria-hidden="true"></span>图层</h2>
+          <button class="ghost-btn" id="btnAddPiece" aria-label="添加一张纸片">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+            <span>添加纸片</span>
+          </button>
+        </div>
+        <ul class="layer-list" id="layerList" aria-label="纸片与底图图层"></ul>
+        <p class="panel-note">把纸片叠到想要的层次上。<br />选中的纸片会一直渗着水。</p>
+      </section>
+    </aside>
+
+    <!-- 中栏：画布 -->
+    <main class="stage">
+      <div class="artboard" id="artboard" role="application" aria-label="拼贴画布，湿纸水彩画板">
+        <canvas id="bgCanvas" aria-hidden="true"></canvas>
+        <div class="pieces-layer" id="piecesLayer" aria-hidden="true"></div>
+
+        <p class="stage-note" aria-hidden="true">水未干，慢慢来。</p>
+        <p class="stage-mark" aria-hidden="true"><span class="en">let the paper breathe</span></p>
+        <div class="stage-hint" id="stageHint" aria-hidden="true">取色中 · 点击纸片取回那抹颜色</div>
+      </div>
+
+      <footer class="statusbar">
+        <span class="status-left">湿纸 · 湿度 24%</span>
+        <span class="status-coord" id="statusCoord" aria-live="off">x — · y —</span>
+        <span class="status-right">滴一滴，看看边缘怎么走</span>
+      </footer>
+    </main>
+
+    <!-- 右栏 280px：色板 / 纹理 / 属性 -->
+    <aside class="rail rail-right" aria-label="色板、纹理与属性">
+
+      <section class="panel swatches-panel">
+        <div class="panel-head">
+          <h2 class="panel-title"><span class="wet-dot" aria-hidden="true"></span>色板</h2>
+          <button class="chip-btn" id="btnDropper" aria-pressed="false" aria-label="滴管取色">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 3.5 20.5 8.5l-2 2-5-5z" /><path d="M13 6.5 4 15.5V20h4.5l9-9" /></svg>
+            取色
+          </button>
+        </div>
+        <div class="swatch-grid" id="swatchList"></div>
+        <div class="swatch-read" id="swatchRead" aria-live="polite">
+          <span class="read-swatch" id="readSwatch" aria-hidden="true"></span>
+          <span class="read-name" id="readName">朱红</span>
+          <code class="read-hex" id="readHex">#C0392B</code>
+        </div>
+      </section>
+
+      <section class="panel textures-panel">
+        <h2 class="panel-title"><span class="wet-dot" aria-hidden="true"></span>纹理</h2>
+        <div class="texture-list" id="textureList" role="listbox" aria-label="水彩纹理"></div>
+      </section>
+
+      <section class="panel props-panel">
+        <h2 class="panel-title"><span class="wet-dot" aria-hidden="true"></span>属性</h2>
+
+        <label class="prop-row" for="propOpacity">
+          <span class="prop-label">透明度</span>
+          <input type="range" id="propOpacity" min="20" max="100" value="92" step="1" />
+          <span class="prop-val" id="propOpacityVal">92%</span>
+        </label>
+
+        <label class="prop-row" for="propBloom">
+          <span class="prop-label">晕染度</span>
+          <input type="range" id="propBloom" min="0" max="100" value="62" step="1" />
+          <span class="prop-val" id="propBloomVal">62%</span>
+        </label>
+
+        <div class="prop-row prop-seg">
+          <span class="prop-label">边缘</span>
+          <div class="seg" role="group" aria-label="边缘湿干">
+            <button class="seg-btn is-active" data-wet="1" aria-pressed="true">湿边</button>
+            <button class="seg-btn" data-wet="0" aria-pressed="false">干边</button>
+          </div>
+        </div>
+
+        <p class="prop-note" id="propNote">湿边 · 墨还在往纸里渗</p>
+      </section>
+    </aside>
+  </div>
+
+  <!-- 移动端：色板横条 -->
+  <div class="mobile-swatches" id="mobileSwatches" aria-label="色板（移动端）"></div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="script.js"></script>
+</body>
+</html>

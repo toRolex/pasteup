@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PASTEUP 活纹理实验室 · LAB PAPER</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%237A8B5C'/%3E%3Cpath d='M9 20 L 12 10 L 16 22 L 20 9 L 24 18' fill='none' stroke='%23F0E8D7' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<meta name="description" content="pasteup 活纹理实验室。6 种程序纹理实时生成，seed 驱动结构，颜色与结构解耦。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&family=Nunito:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app" id="app">
+
+  <!-- ============ 顶栏 56px ============ -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">
+        <span class="bm-grain"></span>
+      </span>
+      <div class="brand-text">
+        <span class="brand-zh">PASTEUP 实验室</span>
+        <span class="brand-tag">LAB · PAPER · 活纹理</span>
+      </div>
+    </div>
+
+    <div class="doc-meta">
+      <span class="doc-name">样品组 07「落叶」</span>
+      <span class="doc-status"><i class="dot" aria-hidden="true"></i>纹理实时</span>
+    </div>
+
+    <div class="top-actions">
+      <button class="tb-btn" id="btnUndo" aria-label="撤销">撤销</button>
+      <button class="tb-btn" id="btnRedo" aria-label="重做">重做</button>
+      <span class="tb-divider" aria-hidden="true"></span>
+      <button class="tb-btn" id="btnExportSvg">导出 SVG</button>
+      <button class="tb-btn primary" id="btnExportPng">导出 PNG</button>
+    </div>
+  </header>
+
+  <div class="workspace">
+
+    <!-- ============ 左栏 260px：工具 + 图层 ============ -->
+    <aside class="leftcol" aria-label="工具与图层">
+      <section class="panel tools-panel">
+        <h2 class="panel-title">工具 <span class="en">Tools</span></h2>
+        <div class="tool-grid" role="toolbar" aria-label="工具">
+          <button class="tool-btn active" data-tool="select">
+            <span class="tool-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 3l13.5 8.6-6 1.6L9.6 20z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></svg></span>
+            <span class="tool-name">选择</span>
+            <span class="tool-key">V</span>
+          </button>
+          <button class="tool-btn" data-tool="trace">
+            <span class="tool-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M17 3l4 4L9 19l-5 1 1-5z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><path d="M14 6l4 4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg></span>
+            <span class="tool-name">描摹</span>
+            <span class="tool-key">P</span>
+          </button>
+          <button class="tool-btn" data-tool="piece">
+            <span class="tool-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M13.5 4v4.5a1 1 0 0 0 1 1H19" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></svg></span>
+            <span class="tool-name">纸片</span>
+            <span class="tool-key">B</span>
+          </button>
+          <button class="tool-btn" data-tool="photo">
+            <span class="tool-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.9"/><circle cx="8.5" cy="10" r="1.7" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M21 15l-5-5-8 8" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></svg></span>
+            <span class="tool-name">底图</span>
+            <span class="tool-key">M</span>
+          </button>
+          <button class="tool-btn" data-tool="brush">
+            <span class="tool-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M13.5 7.5l3 3M9 15l3 3M5 21c2.5-.5 3.5-2 3.5-4 0-1.2.9-2.1 2-2.1" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/><path d="M13 8l5-5 3 3-5 5-3-3z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></svg></span>
+            <span class="tool-name">画笔</span>
+            <span class="tool-key">W</span>
+          </button>
+          <button class="tool-btn" data-tool="eraser">
+            <span class="tool-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 19L3 14l8-8 8 8-4 5H8z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><path d="M13 21h7" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg></span>
+            <span class="tool-name">橡皮</span>
+            <span class="tool-key">E</span>
+          </button>
+        </div>
+      </section>
+
+      <section class="panel layers-panel">
+        <div class="panel-head">
+          <h2 class="panel-title">图层 <span class="en">Layers</span></h2>
+          <span class="mono chip" id="layersCount">3 层</span>
+        </div>
+        <div class="layer-list" id="layerList" role="list" aria-label="图层列表"></div>
+        <div class="panel-foot">
+          <span class="mono note">双击画布可取样新纸片</span>
+          <button class="mini-btn primary" id="btnAddPiece">+ 新纸片</button>
+        </div>
+      </section>
+    </aside>
+
+    <!-- ============ 中画布：工作台 ============ -->
+    <main class="bench" aria-label="拼贴画布工作台">
+      <div class="bench-tools">
+        <span class="bench-tools-left">
+          <span class="mono readout" id="cursorReadout" aria-live="off">x ---- · y ----</span>
+          <span class="mono readout dim" id="hoverReadout" aria-live="polite">悬停纸片看读数</span>
+        </span>
+        <span class="bench-tools-right">
+          <span class="mono readout" id="zoomReadout">100%</span>
+          <button class="mini-btn" id="btnZoomOut" aria-label="缩小">−</button>
+          <button class="mini-btn" id="btnZoomIn" aria-label="放大">+</button>
+        </span>
+      </div>
+
+      <div class="canvas-plane" id="canvasPlane">
+        <canvas class="plane-grid" id="planeGrid" aria-hidden="true"></canvas>
+
+        <div class="plane-scale" id="planeScale">
+          <svg class="trace-guide" id="traceGuide" aria-hidden="true" viewBox="0 0 900 770" preserveAspectRatio="xMidYMid meet">
+            <path class="tg-vein" d="M 480 120 C 470 220 452 340 452 430 C 452 520 468 600 492 650"
+                  fill="none" stroke-width="2" stroke-linecap="round"/>
+            <path class="tg-outline" d="M 470 120 C 330 180 288 330 328 452 C 356 540 428 610 500 650 C 580 610 660 520 668 420 C 674 330 622 190 470 120 Z"
+                  fill="none" stroke-width="2" stroke-linejoin="round"/>
+            <path class="tg-rib" d="M 470 180 C 420 210 392 250 386 300" fill="none" stroke-width="1.4" stroke-linecap="round"/>
+            <path class="tg-rib" d="M 478 260 C 540 290 596 330 616 386" fill="none" stroke-width="1.4" stroke-linecap="round"/>
+            <path class="tg-rib" d="M 468 360 C 560 380 616 420 628 470" fill="none" stroke-width="1.4" stroke-linecap="round"/>
+            <path class="tg-rib" d="M 464 470 C 500 520 528 560 540 596" fill="none" stroke-width="1.4" stroke-linecap="round"/>
+            <path class="tg-rib" d="M 486 520 C 428 540 392 560 378 588" fill="none" stroke-width="1.4" stroke-linecap="round"/>
+          </svg>
+        </div>
+
+        <div class="pinned-note" id="controlNote" aria-label="对照实验：同 seed 异色，结构哈希一致">
+          <div class="pin-note-head">对照实验 <span class="en">Control</span></div>
+          <div class="control-pair">
+            <div class="ctl-sample">
+              <canvas class="ctl-canvas" id="ctlA" width="72" height="72" aria-hidden="true"></canvas>
+              <span class="mono ctl-st">ST <b id="ctlASt">0x----</b></span>
+            </div>
+            <div class="ctl-sample">
+              <canvas class="ctl-canvas" id="ctlB" width="72" height="72" aria-hidden="true"></canvas>
+              <span class="mono ctl-st">ST <b id="ctlBSt">0x----</b></span>
+            </div>
+          </div>
+          <p class="pin-note-msg">同 seed · 异色<br><span class="mono">结构哈希一致，证明「色」与「结构」解耦。</span></p>
+        </div>
+
+        <div class="empty-hint" id="emptyHint"><span class="eh-ico" aria-hidden="true">＋</span> 双击空白处 · 取样新纸片</div>
+
+        <div class="grain-strip" id="grainStrip" aria-hidden="true">
+          <span class="gs-label mono">GRAIN REF</span>
+        </div>
+      </div>
+
+      <div class="bench-readout">
+        <span class="mono readout" id="benchSeed">全局 seed 0x1A2B</span>
+        <span class="bench-readout-mid">
+          <span class="mono readout">6 路程序纹理 · 实时合成</span>
+          <span class="mono readout dim" id="frameCost">0 ms / 帧</span>
+        </span>
+        <button class="mini-btn" id="btnResampleAll">全部重新取样</button>
+      </div>
+    </main>
+
+    <!-- ============ 右栏 280px：色板 / 纹理 / 属性 ============ -->
+    <aside class="rightcol" aria-label="色板、纹理与属性">
+      <section class="panel swatches-panel">
+        <div class="panel-head">
+          <h2 class="panel-title">色板 <span class="en">Swatches</span></h2>
+          <span class="mono chip" id="swatchCount">6 色</span>
+        </div>
+        <div class="swatch-grid" id="swatchGrid" role="list" aria-label="色板"></div>
+        <p class="lab-note">改色只改 <span class="mono">CH</span>，不动 <span class="mono">ST</span> 结构。</p>
+      </section>
+
+      <section class="panel textures-panel">
+        <div class="panel-head">
+          <h2 class="panel-title">纹理 <span class="en">Live</span></h2>
+          <button class="mini-btn icon" id="btnReseedTiles" aria-label="重新取样所有纹理磁贴" title="重新取样所有磁贴">⟳</button>
+        </div>
+        <div class="texture-grid" id="textureGrid" role="list" aria-label="程序纹理磁贴"></div>
+      </section>
+
+      <section class="panel props-panel">
+        <div class="panel-head">
+          <h2 class="panel-title">属性 <span class="en">Properties</span></h2>
+          <span class="mono chip" id="propId">P-01</span>
+        </div>
+        <div class="props" id="propsPanel"></div>
+      </section>
+    </aside>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="script.js"></script>
+</body>
+</html>
