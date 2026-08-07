@@ -14,3 +14,10 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 tauri = { version = "2", features = [] }
+tokio = { version = "1", features = ["sync", "time"] }
+
+# macOS 原生 NSColorSampler（屏幕取色，T15）。仅 macOS 编译，避免 Windows 交叉编译负担。
+[target.'cfg(target_os = "macos")'.dependencies]
+block2 = "0.6"
+objc2-app-kit = { version = "0.3", features = ["NSColorSampler", "NSColor", "NSColorSpace", "block2"] }
+objc2-core-foundation = "0.3"
