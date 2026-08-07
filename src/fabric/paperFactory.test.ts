@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Path } from 'fabric';
+import { Path, Pattern } from 'fabric';
 import { createPaperElement, type PaperElement } from '../types/project';
 import { createFabricPath, paperToFabricOptions } from './paperFactory';
 
@@ -66,5 +66,23 @@ describe('createFabricPath（seam 5）', () => {
     const path = createFabricPath(sampleElement());
     expect(path.stroke).toBeTruthy();
     expect(path.strokeWidth).toBeGreaterThan(0);
+  });
+});
+
+describe('createFabricPath pattern 填充（seam 6，ADR 0001 硬性契约）', () => {
+  it('传入合成 dataURL 时 fill 为 fabric Pattern（repeat），且不设 patternTransform', () => {
+    const path = createFabricPath(sampleElement(), 'data:image/png;base64,iVBORw0KGgo=');
+
+    expect(path.fill).toBeInstanceOf(Pattern);
+    const fill = path.fill as unknown as { repeat?: string; patternTransform?: unknown };
+    expect(fill.repeat).toBe('repeat');
+    // ADR 0001：pattern 完全不设 transform —— 运行时与导出共用同一数据源
+    expect(fill.patternTransform).toBeUndefined();
+  });
+
+  it('未传合成 dataURL 时保持纯色填充（现有行为不回归）', () => {
+    const el = sampleElement();
+    const path = createFabricPath(el);
+    expect(path.fill).toBe(el.color);
   });
 });
