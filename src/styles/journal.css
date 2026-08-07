@@ -338,6 +338,92 @@
   height: 34px;
   cursor: default;
 }
+.swatch--active {
+  outline: 2px solid var(--moss);
+  outline-offset: 1px;
+}
+
+/* ── 右栏属性便签（T10 属性面板：纹理选择器 + 色板 + 属性）──────── */
+.property-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-top: 22px;
+  padding: 14px;
+  background: var(--note);
+  box-shadow: var(--shadow-lift);
+  transform: rotate(1.2deg);
+}
+.property-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.property-label {
+  font-family: var(--font-hand);
+  font-size: 15px;
+  color: var(--ink-soft);
+}
+.property-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.texture-btn,
+.rotate-btn {
+  padding: 4px 9px;
+  font-family: var(--font-body);
+  font-size: 12px;
+  line-height: 1.2;
+  color: var(--ink);
+  background: var(--paper-2);
+  border-radius: var(--radius-tool);
+  box-shadow: var(--shadow-lift);
+  cursor: pointer;
+}
+.texture-btn--active,
+.rotate-btn--active {
+  outline: 2px solid var(--moss);
+  background: var(--paper-deep);
+}
+.property-palette {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.property-palette li {
+  margin: 0;
+}
+.property-swatch {
+  width: 24px;
+  height: 24px;
+}
+.property-control-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.property-control-row input[type='range'] {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--moss);
+}
+.property-value {
+  min-width: 40px;
+  font-family: var(--font-num);
+  font-size: 14px;
+  text-align: right;
+  color: var(--ink);
+}
+.property-empty {
+  margin: 0;
+  font-family: var(--font-scrawl);
+  font-size: 15px;
+  color: var(--ink-soft);
+}
 
 /* ── 新建项目对话框（T3 新建项目流程）──────────────── */
 .new-project-backdrop {

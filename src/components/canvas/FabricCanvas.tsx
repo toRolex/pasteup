@@ -39,17 +39,25 @@ export interface FabricCanvasProps {
   onProjectChange?: (project: PaperProject) => void;
   /** 画布就绪后暴露 fabric.Canvas 实例（供导出、命中测试等扩展用）。 */
   onReady?: (canvas: Canvas) => void;
+  /** 选中变化（fabric → React 单向事件）：当前选中纸片 id，未选中为 null。 */
+  onSelectionChange?: (paperId: string | null) => void;
   /** 导航句柄（单向向下：React → fabric 视口；fabric 事件仍只经 onProjectChange 回灌）。 */
   apiRef?: MutableRefObject<FabricCanvasApi | null>;
   /** 当前工具：trace 进入自由描绘（采点 → 自动闭合 → 纸片回灌）。 */
   activeTool?: FabricTool;
 }
 
-/** 把 project.elements 命令式推送到 fabric 画布（单向向下）。 */
+/** 把 project.elements 命令式推送到 fabric 画布（单向向下）。
+ *  T10（T8 遗留接线）：textureId → textures 表 dataUrl → createFabricPath Pattern 填充。 */
 function renderProject(canvas: Canvas, project: PaperProject): void {
   canvas.clear();
   canvas.setDimensions({ width: project.canvas.width, height: project.canvas.height });
-  for (const el of project.elements) canvas.add(createFabricPath(el));
+  for (const el of project.elements) {
+    const texture = el.textureId
+      ? project.textures.find((t) => t.id === el.textureId)
+      : undefined;
+    canvas.add(createFabricPath(el, texture?.dataUrl));
+  }
   applyBackground(canvas, project.bgPhoto);
   canvas.requestRenderAll();
 }
@@ -106,6 +114,7 @@ export function FabricCanvas({
   project,
   onProjectChange,
   onReady,
+  onSelectionChange,
   apiRef,
   activeTool = 'select',
 }: FabricCanvasProps) {
@@ -115,6 +124,7 @@ export function FabricCanvas({
   const prevProjectRef = useRef<PaperProject | null>(null);
   const onProjectChangeRef = useRef(onProjectChange);
   const onReadyRef = useRef(onReady);
+  const onSelectionChangeRef = useRef(onSelectionChange);
   const apiRefRef = useRef(apiRef);
   const activeToolRef = useRef(activeTool);
   const pointsRef = useRef<{ x: number; y: number }[]>([]);
@@ -124,6 +134,7 @@ export function FabricCanvas({
   projectRef.current = project;
   onProjectChangeRef.current = onProjectChange;
   onReadyRef.current = onReady;
+  onSelectionChangeRef.current = onSelectionChange;
   apiRefRef.current = apiRef;
   activeToolRef.current = activeTool;
 
@@ -169,6 +180,18 @@ export function FabricCanvas({
       const next = readProjectFromCanvas(canvas, projectRef.current);
       onProjectChangeRef.current?.(next);
     });
+
+    // T10 选中联动（fabric → React 单向事件）：选中/切换/清空时上报当前选中纸片 id。
+    // renderProject 重建对象时 fabric 会先 discardActiveObject（selection:cleared）再
+    // setActiveObject（selection:created），React 18 批处理下最终状态仍为被恢复纸片。
+    const emitSelection = () => {
+      const active = canvas.getActiveObject();
+      const paperId = (active as unknown as { paperId?: string } | undefined)?.paperId ?? null;
+      onSelectionChangeRef.current?.(paperId);
+    };
+    canvas.on('selection:created', emitSelection);
+    canvas.on('selection:updated', emitSelection);
+    canvas.on('selection:cleared', emitSelection);
 
     // 自由描绘（trace 工具）：pointer 采集 scenePoint，实时笔迹 + 松开自动闭合。
     // 单向向上：闭合生成的纸片经 onProjectChange 回灌 store，不在 fabric 侧持有 React 状态。

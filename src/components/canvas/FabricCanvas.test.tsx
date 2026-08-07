@@ -1,10 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render, waitFor } from '@testing-library/react';
-import { Canvas, FabricImage, Point, type TPointerEventInfo } from 'fabric';
+import { Canvas, FabricImage, Pattern, Point, type TPointerEventInfo } from 'fabric';
 import { FabricCanvas, type FabricCanvasApi } from './FabricCanvas';
 import {
   createEmptyProject,
   createPaperElement,
+  createPaperTexture,
   type PaperProject,
 } from '../../types/project';
 
@@ -476,5 +477,114 @@ describe('FabricCanvas 选择/变换（T6 seam 4/5）— select 模式自定义�
 
     rerender(<FabricCanvas project={restored} onReady={(c) => { canvas = c; }} />);
     expect(canvas!.getObjects()[0].left).toBe(0);
+  });
+});
+
+describe('FabricCanvas 选中联动（T10 seam 4）— fabric 选中 → React 单向事件', () => {
+  const RECT = 'M 0 0 L 100 0 L 100 80 L 0 80 Z';
+
+  function dispatchMouseDown(canvas: Canvas, x: number, y: number): void {
+    const el = canvas.upperCanvasEl || canvas.lowerCanvasEl;
+    el.dispatchEvent(
+      new MouseEvent('mousedown', { clientX: x, clientY: y, bubbles: true, cancelable: true, button: 0 }),
+    );
+  }
+  function dispatchMouseUp(canvas: Canvas, x: number, y: number): void {
+    const el = canvas.upperCanvasEl || canvas.lowerCanvasEl;
+    el.dispatchEvent(
+      new MouseEvent('mouseup', { clientX: x, clientY: y, bubbles: true, cancelable: true, button: 0 }),
+    );
+  }
+  function clickAt(canvas: Canvas, x: number, y: number): void {
+    dispatchMouseDown(canvas, x, y);
+    dispatchMouseUp(canvas, x, y);
+  }
+
+  it('点击纸片 → onSelectionChange(paperId)；点空白 → onSelectionChange(null)', () => {
+    let canvas: Canvas | undefined;
+    const onSelectionChange = vi.fn();
+    const project = createEmptyProject(1200, 800);
+    const paper = createPaperElement({ path: RECT, color: '#c0392b' });
+    project.elements.push(paper);
+
+    render(
+      <FabricCanvas
+        project={project}
+        onReady={(c) => { canvas = c; }}
+        onSelectionChange={onSelectionChange}
+      />,
+    );
+
+    clickAt(canvas!, 50, 40);
+    expect(onSelectionChange).toHaveBeenLastCalledWith(paper.id);
+
+    clickAt(canvas!, 600, 600);
+    expect(onSelectionChange).toHaveBeenLastCalledWith(null);
+  });
+
+  it('纸片间切换选中 → onSelectionChange 上报新 paperId', () => {
+    let canvas: Canvas | undefined;
+    const onSelectionChange = vi.fn();
+    const project = createEmptyProject(1200, 800);
+    const a = createPaperElement({ path: RECT, color: '#c0392b' });
+    const b = createPaperElement({
+      path: RECT,
+      color: '#7A8B5C',
+      transform: { x: 200, y: 0, rotation: 0, scaleX: 1, scaleY: 1 },
+    });
+    project.elements.push(a, b);
+
+    render(
+      <FabricCanvas
+        project={project}
+        onReady={(c) => { canvas = c; }}
+        onSelectionChange={onSelectionChange}
+      />,
+    );
+
+    clickAt(canvas!, 50, 40); // A
+    expect(onSelectionChange).toHaveBeenLastCalledWith(a.id);
+    clickAt(canvas!, 250, 40); // B
+    expect(onSelectionChange).toHaveBeenLastCalledWith(b.id);
+  });
+});
+
+describe('FabricCanvas 纹理填充接线（T10 seam 5 / T8 遗留）— textureId → textures 表 dataUrl', () => {
+  const RECT = 'M 0 0 L 100 0 L 100 80 L 0 80 Z';
+
+  it('textureId 引用的纸片用 textures 表 dataUrl 做 Pattern 填充', () => {
+    let canvas: Canvas | undefined;
+    const project = createEmptyProject(1200, 800);
+    project.textures.push(
+      createPaperTexture({
+        id: 'tex-1',
+        style: 'fold',
+        seed: 42,
+        color: '#7A8B5C',
+        scale: 1,
+        rotate: 0,
+        dataUrl: 'data:image/png;base64,TEX',
+      }),
+    );
+    project.elements.push(
+      createPaperElement({ path: RECT, color: '#7A8B5C', textureId: 'tex-1' }),
+    );
+
+    render(<FabricCanvas project={project} onReady={(c) => { canvas = c; }} />);
+    const paper = canvas!.getObjects()[0];
+    expect(paper.fill).toBeInstanceOf(Pattern);
+    expect((paper.fill as unknown as { repeat?: string }).repeat).toBe('repeat');
+  });
+
+  it('textureId 指向缺失记录时保持纯色填充（不抛错）', () => {
+    let canvas: Canvas | undefined;
+    const project = createEmptyProject(1200, 800);
+    project.elements.push(
+      createPaperElement({ path: RECT, color: '#c0392b', textureId: 'missing' }),
+    );
+
+    render(<FabricCanvas project={project} onReady={(c) => { canvas = c; }} />);
+    const paper = canvas!.getObjects()[0];
+    expect(paper.fill).toBe('#c0392b');
   });
 });

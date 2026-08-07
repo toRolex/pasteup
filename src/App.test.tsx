@@ -30,6 +30,12 @@ describe('App 集成（seam S3）— 三栏骨架 + store 驱动的画布', () =
     expect(screen.getByTestId('journal-right')).toBeInTheDocument();
   });
 
+  it('右栏渲染属性面板，未选中时显示占位', () => {
+    render(<App />);
+    expect(screen.getByTestId('property-panel')).toBeInTheDocument();
+    expect(screen.getByTestId('property-empty')).toHaveTextContent('未选中纸片');
+  });
+
   it('画布元素尺寸来自 store 默认项目（2480×3508）', () => {
     render(<App />);
     const canvasEl = screen.getByTestId('fabric-canvas').querySelector('canvas');
