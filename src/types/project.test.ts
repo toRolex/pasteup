@@ -104,3 +104,40 @@ describe('serializeProject / parseProject（seam 3）', () => {
     );
   });
 });
+
+describe('PaperElement.seed（seam 5：seed 写入纸片数据模型）', () => {
+  it('未提供 seed 时默认生成 uint32 整数 seed', () => {
+    const el = createPaperElement({ path: 'M 0 0 Z', color: '#000' });
+
+    expect(typeof el.seed).toBe('number');
+    expect(Number.isInteger(el.seed)).toBe(true);
+    expect(el.seed).toBeGreaterThanOrEqual(0);
+    expect(el.seed).toBeLessThan(2 ** 32);
+  });
+
+  it('可经 input 覆盖 seed（测试与 T12 重开一致依赖显式 seed）', () => {
+    const el = createPaperElement({ path: 'M 0 0 Z', color: '#000', seed: 12345 });
+    expect(el.seed).toBe(12345);
+  });
+
+  it('seed 在 serialize → parse 往返中精确保真', () => {
+    const project: PaperProject = {
+      version: 1,
+      canvas: { width: 100, height: 100 },
+      bgPhoto: null,
+      textures: [],
+      elements: [
+        createPaperElement({
+          path: 'M 0 0 L 10 0 L 10 10 Z',
+          color: '#7a8b5c',
+          seed: 987654321,
+        }),
+      ],
+    };
+
+    const restored = parseProject(serializeProject(project));
+
+    expect(restored.elements[0].seed).toBe(987654321);
+    expect(restored).toEqual(project);
+  });
+});
