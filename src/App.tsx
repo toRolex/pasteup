@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import type { Canvas } from 'fabric';
 import {
   FabricCanvas,
   type FabricCanvasApi,
@@ -6,6 +7,7 @@ import {
 } from './components/canvas/FabricCanvas';
 import { NewProjectDialog } from './components/dialogs/NewProjectDialog';
 import { PalettePanel } from './components/panels/PalettePanel';
+import { downloadPNG, exportCanvasToPNG } from './export/png';
 import { useScreenPicker } from './picker/useScreenPicker';
 import { JournalShell } from './styles/journalLayout';
 import { useProjectStore } from './store/projectStore';
@@ -16,9 +18,17 @@ export default function App() {
   const setBackgroundPhoto = useProjectStore((s) => s.setBackgroundPhoto);
   const bgPhoto = project.bgPhoto;
   const apiRef = useRef<FabricCanvasApi | null>(null);
+  const canvasRef = useRef<Canvas | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const { activate: activatePicker } = useScreenPicker();
   const [tool, setTool] = useState<FabricTool>('select');
+
+  function handleExportPNG() {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const { dataUrl, width, height } = exportCanvasToPNG(canvas, project);
+    downloadPNG(dataUrl, `pasteup-export-${width}x${height}.png`);
+  }
 
   return (
     <div className="app-shell">
@@ -113,6 +123,14 @@ export default function App() {
             >
               复位
             </button>
+            <button
+              className="tool-btn"
+              data-testid="export-png"
+              aria-label="导出 PNG"
+              onClick={handleExportPNG}
+            >
+              导出 PNG
+            </button>
             <span className="tape tape--topbar" aria-hidden="true" />
           </div>
         }
@@ -131,7 +149,13 @@ export default function App() {
           </div>
         }
       >
-        <FabricCanvas project={project} onProjectChange={setProject} apiRef={apiRef} activeTool={tool} />
+        <FabricCanvas
+          project={project}
+          onProjectChange={setProject}
+          apiRef={apiRef}
+          activeTool={tool}
+          onReady={(c) => { canvasRef.current = c; }}
+        />
       </JournalShell>
       <NewProjectDialog open={dialogOpen} onClose={() => setDialogOpen(false)} />
       <div className="grain" aria-hidden="true" />

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import App from './App';
 import { tokens } from './styles/tokens';
@@ -75,5 +75,34 @@ describe('App 集成（seam S3）— 三栏骨架 + store 驱动的画布', () =
     fireEvent.click(selectBtn);
     expect(selectBtn).toHaveAttribute('aria-pressed', 'true');
     expect(traceBtn).toHaveAttribute('aria-pressed', 'false');
+  });
+});
+
+describe('App 导出 PNG（T14 seam 8）— 顶栏按钮触发导出 + 下载', () => {
+  beforeEach(() => {
+    useProjectStore.setState({ project: createDefaultProject() });
+  });
+
+  it('「导出 PNG」按钮存在，点击后以 project 尺寸文件名触发下载', () => {
+    const createSpy = vi.spyOn(document, 'createElement');
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    render(<App />);
+
+    const btn = screen.getByTestId('export-png');
+    expect(btn).toBeInTheDocument();
+
+    fireEvent.click(btn);
+
+    // 下载锚点：download 属性携带 project 像素尺寸文件名
+    const exportAnchor = createSpy.mock.results
+      .map((r) => r.value as HTMLAnchorElement)
+      .find((el) => el.tagName?.toLowerCase() === 'a' && el.download !== '');
+    expect(exportAnchor).toBeDefined();
+    expect(exportAnchor!.download).toBe('pasteup-export-2480x3508.png');
+    expect(exportAnchor!.href).toMatch(/^data:image\/png;base64,/);
+    expect(clickSpy).toHaveBeenCalled();
+
+    clickSpy.mockRestore();
+    createSpy.mockRestore();
   });
 });
