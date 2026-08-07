@@ -8,6 +8,7 @@ import {
 import { NewProjectDialog } from './components/dialogs/NewProjectDialog';
 import { PalettePanel } from './components/panels/PalettePanel';
 import { downloadPNG, exportCanvasToPNG } from './export/png';
+import { PropertyPanel } from './components/panels/PropertyPanel';
 import { useScreenPicker } from './picker/useScreenPicker';
 import { JournalShell } from './styles/journalLayout';
 import { useProjectStore } from './store/projectStore';
@@ -26,6 +27,8 @@ export default function App() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const { activate: activatePicker } = useScreenPicker();
   const [tool, setTool] = useState<FabricTool>('select');
+  // T10 选中联动：fabric 选中 → onSelectionChange 单向上报当前纸片 id → 属性面板显示。
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   // 撤销/重做快捷键：Cmd/Ctrl+Z 撤销，Shift+Cmd/Ctrl+Z 重做。
   // MVP 无输入框场景，做全局 keydown 处理；T10 属性面板接入输入框时再细化跳过聚焦场景。
@@ -193,6 +196,7 @@ export default function App() {
         rightPage={
           <div className="page-scaffold">
             <PalettePanel />
+            <PropertyPanel selectedId={selectedId} />
             <span className="stamp">已装订</span>
           </div>
         }
@@ -200,6 +204,7 @@ export default function App() {
         <FabricCanvas
           project={project}
           onProjectChange={commitProject}
+          onSelectionChange={setSelectedId}
           apiRef={apiRef}
           activeTool={tool}
           onReady={(c) => { canvasRef.current = c; }}
