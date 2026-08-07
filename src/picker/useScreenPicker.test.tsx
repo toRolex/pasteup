@@ -1,0 +1,127 @@
+/**
+ * S5 — useScreenPicker 交互编排（jsdom 可测：keydown/keyup + store 状态迁移）。
+ * 真实 NSColorSampler 不可测，mock `pickScreenColor` 的返回契约。
+ */
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { DEFAULT_CURRENT_COLOR, useEditorStore } from '../store/editorStore';
+import { DEFAULT_TOOL, useToolStore } from '../store/toolStore';
+import { PICK_COLOR_MODIFIER, PICK_COLOR_SHORTCUT, useScreenPicker } from './useScreenPicker';
+
+const pickScreenColorMock = vi.hoisted(() => vi.fn());
+vi.mock('./pickScreenColor', () => ({
+  pickScreenColor: pickScreenColorMock,
+}));
+
+function Harness() {
+  const { activate } = useScreenPicker();
+  return (
+    <button data-testid="pick-btn" onClick={() => activate()}>
+      pick
+    </button>
+  );
+}
+
+function renderHarness() {
+  return render(<Harness />);
+}
+
+const flush = () => new Promise((r) => setTimeout(r, 0));
+
+describe('useScreenPicker（S5）— 取色交互编排', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useEditorStore.setState({ currentColor: DEFAULT_CURRENT_COLOR, recentColors: [] });
+    useToolStore.setState({ tool: DEFAULT_TOOL, previousTool: null, activePickTemporary: false });
+  });
+
+  it('快捷键 I 触发正式取色：成功写入选色并追加 MRU、自动切回前工具', async () => {
+    pickScreenColorMock.mockResolvedValue('#123456');
+    renderHarness();
+    fireEvent.keyDown(window, { key: PICK_COLOR_SHORTCUT });
+    // 进入取色是同步的
+    expect(useToolStore.getState().tool).toBe('picker');
+    await vi.waitFor(() => expect(useEditorStore.getState().currentColor).toBe('#123456'));
+    expect(useEditorStore.getState().recentColors).toEqual(['#123456']);
+    expect(useToolStore.getState().tool).toBe(DEFAULT_TOOL);
+  });
+
+  it('取色取消（null）→ 退出取色，不写入选色', async () => {
+    pickScreenColorMock.mockResolvedValue(null);
+    renderHarness();
+    fireEvent.keyDown(window, { key: PICK_COLOR_SHORTCUT });
+    expect(useToolStore.getState().tool).toBe('picker');
+    await vi.waitFor(() => expect(useToolStore.getState().tool).toBe(DEFAULT_TOOL));
+    expect(useEditorStore.getState().currentColor).toBe(DEFAULT_CURRENT_COLOR);
+    expect(useEditorStore.getState().recentColors).toEqual([]);
+  });
+
+  it('Esc 在取色中取消退出，结果被丢弃', async () => {
+    pickScreenColorMock.mockResolvedValue('#123456');
+    renderHarness();
+    fireEvent.keyDown(window, { key: PICK_COLOR_SHORTCUT });
+    expect(useToolStore.getState().tool).toBe('picker');
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(useToolStore.getState().tool).toBe(DEFAULT_TOOL);
+    await flush();
+    expect(useEditorStore.getState().currentColor).toBe(DEFAULT_CURRENT_COLOR);
+    expect(useEditorStore.getState().recentColors).toEqual([]);
+  });
+
+  it('Esc 非取色中为 no-op', async () => {
+    renderHarness();
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(useToolStore.getState().tool).toBe(DEFAULT_TOOL);
+    expect(pickScreenColorMock).not.toHaveBeenCalled();
+  });
+
+  it('按住 Alt 临时取色：取到色后仍停留取色，松开回到原工具', async () => {
+    pickScreenColorMock.mockResolvedValue('#abcdef');
+    renderHarness();
+    fireEvent.keyDown(window, { key: PICK_COLOR_MODIFIER });
+    expect(useToolStore.getState().tool).toBe('picker');
+    expect(useToolStore.getState().activePickTemporary).toBe(true);
+    // 临时模式：取到色后不退出，直到松开修饰键
+    await vi.waitFor(() => expect(useEditorStore.getState().currentColor).toBe('#abcdef'));
+    expect(useToolStore.getState().tool).toBe('picker');
+    expect(useEditorStore.getState().recentColors).toEqual(['#abcdef']);
+    fireEvent.keyUp(window, { key: PICK_COLOR_MODIFIER });
+    expect(useToolStore.getState().tool).toBe(DEFAULT_TOOL);
+    expect(useToolStore.getState().activePickTemporary).toBe(false);
+  });
+
+  it('工具按钮点击触发正式取色（与快捷键同一条流程）', async () => {
+    pickScreenColorMock.mockResolvedValue('#ff00aa');
+    renderHarness();
+    fireEvent.click(screen.getByTestId('pick-btn'));
+    expect(useToolStore.getState().tool).toBe('picker');
+    await vi.waitFor(() => expect(useEditorStore.getState().currentColor).toBe('#ff00aa'));
+    expect(useToolStore.getState().tool).toBe(DEFAULT_TOOL);
+  });
+
+  it('输入框聚焦时快捷键不触发取色', async () => {
+    pickScreenColorMock.mockResolvedValue('#123456');
+    render(
+      <div>
+        <input data-testid="name-input" />
+        <Harness />
+      </div>,
+    );
+    const input = screen.getByTestId('name-input');
+    input.focus();
+    fireEvent.keyDown(input, { key: PICK_COLOR_SHORTCUT });
+    expect(useToolStore.getState().tool).toBe(DEFAULT_TOOL);
+    expect(pickScreenColorMock).not.toHaveBeenCalled();
+  });
+
+  it('已在取色中重复触发为 no-op', async () => {
+    pickScreenColorMock.mockResolvedValue('#123456');
+    renderHarness();
+    fireEvent.keyDown(window, { key: PICK_COLOR_SHORTCUT });
+    // 未等完成再次触发
+    fireEvent.keyDown(window, { key: PICK_COLOR_SHORTCUT });
+    await flush();
+    expect(pickScreenColorMock).toHaveBeenCalledTimes(1);
+    expect(useEditorStore.getState().currentColor).toBe('#123456');
+  });
+});

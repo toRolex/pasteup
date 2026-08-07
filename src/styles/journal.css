@@ -269,6 +269,71 @@
   transform: translateY(0);
 }
 
+/* ── 右栏色卡面板（T15 当前选中色 + 「最近使用」MRU）──────── */
+.palette-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.palette-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.palette-label {
+  font-family: var(--font-hand);
+  font-size: 15px;
+  color: var(--ink-soft);
+}
+.palette-current-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.palette-hex {
+  font-family: var(--font-num);
+  font-size: 14px;
+  color: var(--ink);
+}
+.palette-empty {
+  margin: 0;
+  font-family: var(--font-scrawl);
+  font-size: 14px;
+  color: var(--ink-soft);
+}
+.palette-mru {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.palette-mru li {
+  margin: 0;
+}
+.swatch {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 2px solid rgba(90, 70, 52, 0.28);
+  border-radius: var(--radius-chip);
+  box-shadow: var(--shadow-lift);
+  cursor: pointer;
+  transition:
+    transform var(--motion-duration) var(--ease-spring),
+    box-shadow var(--motion-duration) var(--ease-out);
+}
+.swatch:hover {
+  box-shadow: var(--shadow-hover);
+  transform: translateY(-1px);
+}
+.swatch--current {
+  width: 34px;
+  height: 34px;
+  cursor: default;
+}
+
 /* ── 新建项目对话框（T3 新建项目流程）──────────────── */
 .new-project-backdrop {
   position: fixed;

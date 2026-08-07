@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@tauri-apps/api':
+        specifier: ^2.11.1
+        version: 2.11.1
       fabric:
         specifier: ^7.4.0
         version: 7.4.0(supports-color@7.1.0)
@@ -506,6 +509,9 @@ packages:
     resolution: {integrity: sha512-zD6NdeWEByGE9QF9vCrlJ5YQB4oq9q91kPZS37Jwj5hOkvR1lTBSpsKhKDw4IJtbQ35LsTS1HD9DZYGKIshU1Q==}
     cpu: [x64]
     os: [win32]
+
+  '@tauri-apps/api@2.11.1':
+    resolution: {integrity: sha512-M2FPuYND2m+wh5hfW9ZpSdxMPdEJovPBWwoHJmwUpysTYNHaOkVFN419m/K0LIgjb/7KU2vBgsUepJWugQCvAA==}
 
   '@testing-library/dom@10.4.1':
     resolution: {integrity: sha512-o4PXJQidqJl82ckFaXUeoAW+XysPLauYI43Abki5hABd853iMhitooc6znOnczgbTYmEP6U6/y1ZyKAIsvMKGg==}
@@ -1628,6 +1634,8 @@ snapshots:
 
   '@rollup/rollup-win32-x64-msvc@4.62.4':
     optional: true
+
+  '@tauri-apps/api@2.11.1': {}
 
   '@testing-library/dom@10.4.1':
     dependencies:

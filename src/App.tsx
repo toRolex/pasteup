@@ -1,6 +1,8 @@
 import { useRef, useState } from 'react';
 import { FabricCanvas, type FabricCanvasApi } from './components/canvas/FabricCanvas';
 import { NewProjectDialog } from './components/dialogs/NewProjectDialog';
+import { PalettePanel } from './components/panels/PalettePanel';
+import { useScreenPicker } from './picker/useScreenPicker';
 import { JournalShell } from './styles/journalLayout';
 import { useProjectStore } from './store/projectStore';
 
@@ -11,6 +13,7 @@ export default function App() {
   const bgPhoto = project.bgPhoto;
   const apiRef = useRef<FabricCanvasApi | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const { activate: activatePicker } = useScreenPicker();
 
   return (
     <div className="app-shell">
@@ -24,6 +27,15 @@ export default function App() {
               onClick={() => setDialogOpen(true)}
             >
               新建
+            </button>
+            <button
+              className="tool-btn"
+              data-testid="pick-color"
+              aria-label="屏幕取色"
+              title="屏幕取色（I）"
+              onClick={() => activatePicker()}
+            >
+              取色
             </button>
             <span className="brand-spacer" aria-hidden="true" />
             <button
@@ -93,10 +105,7 @@ export default function App() {
         }
         rightPage={
           <div className="page-scaffold">
-            <h2 className="page-heading">色卡</h2>
-            <div className="torn-paper">
-              <span className="note-text">右页待承载：色板 / 纹理 / 属性便签</span>
-            </div>
+            <PalettePanel />
             <span className="stamp">已装订</span>
           </div>
         }
