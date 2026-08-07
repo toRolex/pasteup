@@ -239,3 +239,78 @@
   animation-iteration-count: 1 !important;
   transition-duration: 0.001s !important;
 }
+
+/* ── 顶栏工具按钮 + 间距（T3 新建项目 / 画布导航）──────── */
+.brand-spacer {
+  flex: 1;
+}
+
+.tool-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  line-height: 1;
+  color: var(--ink);
+  background: var(--paper-2);
+  border-radius: var(--radius-tool);
+  box-shadow: var(--shadow-lift);
+  transition:
+    transform var(--motion-duration) var(--ease-spring),
+    box-shadow var(--motion-duration) var(--ease-out);
+}
+.tool-btn:hover {
+  box-shadow: var(--shadow-hover);
+  transform: translateY(-1px);
+}
+.tool-btn:active {
+  transform: translateY(0);
+}
+
+/* ── 新建项目对话框（T3 新建项目流程）──────────────── */
+.new-project-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: oklch(0.25 0.03 60 / 0.35);
+}
+.new-project-card {
+  width: 320px;
+  padding: 22px 24px 20px;
+  background: var(--bg);
+  border-radius: var(--radius-chip);
+  box-shadow: var(--shadow-book);
+}
+.new-project-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 12px 0;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+.new-project-field select {
+  padding: 6px 8px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--ink);
+  background: var(--paper-2);
+  border: 1px solid var(--ink-line);
+  border-radius: var(--radius-tool);
+}
+.new-project-preview {
+  margin: 12px 0;
+  font-family: var(--font-num);
+  font-size: 15px;
+  color: var(--moss-deep);
+}
+.new-project-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
