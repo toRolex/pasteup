@@ -9,6 +9,7 @@ import { PalettePanel } from './components/panels/PalettePanel';
 import { useScreenPicker } from './picker/useScreenPicker';
 import { JournalShell } from './styles/journalLayout';
 import { useProjectStore } from './store/projectStore';
+import { exportProjectToSVG, saveSvgFile } from './export/svg';
 
 export default function App() {
   const project = useProjectStore((s) => s.project);
@@ -19,6 +20,11 @@ export default function App() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const { activate: activatePicker } = useScreenPicker();
   const [tool, setTool] = useState<FabricTool>('select');
+
+  const handleExportSvg = async () => {
+    const svg = await exportProjectToSVG(project);
+    saveSvgFile(svg, 'pasteup.svg');
+  };
 
   return (
     <div className="app-shell">
@@ -89,6 +95,13 @@ export default function App() {
                 {bgPhoto.visible ? '隐藏底图' : '显示底图'}
               </button>
             )}
+            <button
+              className="tool-btn"
+              data-testid="export-svg"
+              onClick={() => void handleExportSvg()}
+            >
+              导出 SVG
+            </button>
             <button
               className="tool-btn"
               data-testid="zoom-out"

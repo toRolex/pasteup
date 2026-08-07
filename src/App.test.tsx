@@ -1,11 +1,18 @@
-import { beforeEach, describe, expect, it } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import App from './App';
 import { tokens } from './styles/tokens';
 import {
   createDefaultProject,
   useProjectStore,
 } from './store/projectStore';
+
+const exportProjectToSVGMock = vi.hoisted(() => vi.fn());
+const saveSvgFileMock = vi.hoisted(() => vi.fn());
+vi.mock('./export/svg', () => ({
+  exportProjectToSVG: exportProjectToSVGMock,
+  saveSvgFile: saveSvgFileMock,
+}));
 
 const normalize = (s: string) => s.replace(/\s+/g, '');
 
@@ -75,5 +82,31 @@ describe('App 集成（seam S3）— 三栏骨架 + store 驱动的画布', () =
     fireEvent.click(selectBtn);
     expect(selectBtn).toHaveAttribute('aria-pressed', 'true');
     expect(traceBtn).toHaveAttribute('aria-pressed', 'false');
+  });
+});
+
+describe('App 集成（S5）— 顶栏「导出 SVG」按钮触发导出 + 下载', () => {
+  beforeEach(() => {
+    exportProjectToSVGMock.mockReset();
+    saveSvgFileMock.mockReset();
+    useProjectStore.setState({ project: createDefaultProject() });
+  });
+
+  it('顶栏渲染「导出 SVG」按钮', () => {
+    render(<App />);
+    expect(screen.getByTestId('export-svg')).toBeInTheDocument();
+  });
+
+  it('点击后调用 exportProjectToSVG 并用返回的 SVG 触发 saveSvgFile', async () => {
+    exportProjectToSVGMock.mockResolvedValue('<svg xmlns="http://www.w3.org/2000/svg"></svg>');
+    render(<App />);
+    fireEvent.click(screen.getByTestId('export-svg'));
+
+    await waitFor(() => expect(saveSvgFileMock).toHaveBeenCalledTimes(1));
+    expect(exportProjectToSVGMock).toHaveBeenCalledTimes(1);
+    expect(saveSvgFileMock).toHaveBeenCalledWith(
+      '<svg xmlns="http://www.w3.org/2000/svg"></svg>',
+      'pasteup.svg',
+    );
   });
 });
