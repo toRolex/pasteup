@@ -248,3 +248,195 @@ describe('FabricCanvas 描摹（seam 5）— trace 工具：采点 → 自动闭
     expect(canvas!.skipTargetFind).toBe(false);
   });
 });
+
+describe('FabricCanvas 选择/变换（T6 seam 4/5）— select 模式自定义轮廓命中', () => {
+  /** 派发真实 DOM mousedown，触发 fabric __onMouseDown → findTarget → _checkTarget 覆写。 */
+  function dispatchMouseDown(canvas: Canvas, x: number, y: number): void {
+    const el = canvas.upperCanvasEl || canvas.lowerCanvasEl;
+    el.dispatchEvent(
+      new MouseEvent('mousedown', {
+        clientX: x,
+        clientY: y,
+        bubbles: true,
+        cancelable: true,
+        button: 0,
+      }),
+    );
+  }
+
+  /** 补发 mouseup（冒泡到 document，清空 fabric _currentTransform），完成单击手势。 */
+  function dispatchMouseUp(canvas: Canvas, x: number, y: number): void {
+    const el = canvas.upperCanvasEl || canvas.lowerCanvasEl;
+    el.dispatchEvent(
+      new MouseEvent('mouseup', {
+        clientX: x,
+        clientY: y,
+        bubbles: true,
+        cancelable: true,
+        button: 0,
+      }),
+    );
+  }
+
+  /** 拖拽过程发 mousemove（fabric 变换由 mousemove 驱动）。 */
+  function dispatchMouseMove(canvas: Canvas, x: number, y: number): void {
+    const el = canvas.upperCanvasEl || canvas.lowerCanvasEl;
+    el.dispatchEvent(
+      new MouseEvent('mousemove', {
+        clientX: x,
+        clientY: y,
+        bubbles: true,
+        cancelable: true,
+        button: 0,
+      }),
+    );
+  }
+
+  /** 完整单击（mousedown + mouseup），避免 _currentTransform 残留阻塞后续 mousedown。 */
+  function clickAt(canvas: Canvas, x: number, y: number): void {
+    dispatchMouseDown(canvas, x, y);
+    dispatchMouseUp(canvas, x, y);
+  }
+
+  function activePaperId(canvas: Canvas | undefined): string | undefined {
+    return (canvas?.getActiveObject() as { paperId?: string } | undefined)?.paperId;
+  }
+
+  const RECT = 'M 0 0 L 100 0 L 100 80 L 0 80 Z';
+  const L_SHAPE = 'M 0 0 L 100 0 L 100 40 L 40 40 L 40 100 L 0 100 Z';
+
+  it('点击纸片内部选中；bbox 内形状外（L 形凹槽）不误命中', () => {
+    let canvas: Canvas | undefined;
+    const project = createEmptyProject(1200, 800);
+    const paper = createPaperElement({ path: L_SHAPE, color: '#c0392b' });
+    project.elements.push(paper);
+
+    render(<FabricCanvas project={project} onReady={(c) => { canvas = c; }} />);
+
+    clickAt(canvas!, 50, 20); // L 形实体横条 → 选中
+    expect(activePaperId(canvas)).toBe(paper.id);
+
+    clickAt(canvas!, 50, 50); // L 形凹槽（bbox 内形状外）→ 不选中
+    expect(canvas!.getActiveObject()).toBeUndefined();
+  });
+
+  it('边缘容差命中：边外 3px 内仍可选中（超越 fabric bbox 命中）', () => {
+    let canvas: Canvas | undefined;
+    const project = createEmptyProject(1200, 800);
+    const paper = createPaperElement({ path: RECT, color: '#c0392b' });
+    project.elements.push(paper);
+
+    render(<FabricCanvas project={project} onReady={(c) => { canvas = c; }} />);
+
+    clickAt(canvas!, 103, 40); // 右边缘外 3px ≤ 容差 4
+    expect(activePaperId(canvas)).toBe(paper.id);
+  });
+
+  it('未命中时清空已选中', () => {
+    let canvas: Canvas | undefined;
+    const project = createEmptyProject(1200, 800);
+    project.elements.push(createPaperElement({ path: RECT, color: '#c0392b' }));
+
+    render(<FabricCanvas project={project} onReady={(c) => { canvas = c; }} />);
+
+    clickAt(canvas!, 50, 40);
+    expect(canvas!.getActiveObject()).toBeDefined();
+
+    clickAt(canvas!, 600, 600); // 空白区域
+    expect(canvas!.getActiveObject()).toBeUndefined();
+  });
+
+  it('重叠纸片命中 z 序最上层（elements 数组尾 → 顶）', () => {
+    let canvas: Canvas | undefined;
+    const project = createEmptyProject(1200, 800);
+    const bottom = createPaperElement({ path: RECT, color: '#c0392b' });
+    const top = createPaperElement({
+      path: RECT,
+      color: '#7A8B5C',
+      transform: { x: 50, y: 40, rotation: 0, scaleX: 1, scaleY: 1 },
+    });
+    project.elements.push(bottom, top);
+
+    render(<FabricCanvas project={project} onReady={(c) => { canvas = c; }} />);
+
+    clickAt(canvas!, 75, 60); // 两纸片重叠区
+    expect(activePaperId(canvas)).toBe(top.id);
+  });
+
+  it('变换写回数据模型（object:modified），重渲染后选中按 paperId 保持', () => {
+    let canvas: Canvas | undefined;
+    const onProjectChange = vi.fn();
+    const project = createEmptyProject(1200, 800);
+    const paper = createPaperElement({ path: RECT, color: '#c0392b' });
+    project.elements.push(paper);
+
+    const { rerender } = render(
+      <FabricCanvas
+        project={project}
+        onReady={(c) => { canvas = c; }}
+        onProjectChange={onProjectChange}
+      />,
+    );
+
+    clickAt(canvas!, 50, 40);
+    expect(activePaperId(canvas)).toBe(paper.id);
+
+    const obj = canvas!.getActiveObject();
+    expect(obj).toBeDefined();
+    obj!.set({ left: 150, top: 120, angle: 30, scaleX: 1.5, scaleY: 1.5 });
+    canvas!.fire('object:modified', { target: obj! });
+
+    expect(onProjectChange).toHaveBeenCalledTimes(1);
+    const next = onProjectChange.mock.calls[0][0] as PaperProject;
+    expect(next.elements[0].transform).toEqual({
+      x: 150,
+      y: 120,
+      rotation: 30,
+      scaleX: 1.5,
+      scaleY: 1.5,
+    });
+
+    // store 回灌 → 重渲染（renderProject 重建对象），选中不丢失
+    rerender(
+      <FabricCanvas
+        project={next}
+        onReady={(c) => { canvas = c; }}
+        onProjectChange={onProjectChange}
+      />,
+    );
+    expect(activePaperId(canvas)).toBe(paper.id);
+  });
+
+  it('选中后拖拽移动：mousedown → mousemove → mouseup 变换写回数据模型', () => {
+    let canvas: Canvas | undefined;
+    const onProjectChange = vi.fn();
+    const project = createEmptyProject(1200, 800);
+    const paper = createPaperElement({ path: RECT, color: '#c0392b' });
+    project.elements.push(paper);
+
+    render(
+      <FabricCanvas
+        project={project}
+        onReady={(c) => { canvas = c; }}
+        onProjectChange={onProjectChange}
+      />,
+    );
+
+    dispatchMouseDown(canvas!, 50, 40);
+    expect(activePaperId(canvas)).toBe(paper.id);
+
+    dispatchMouseMove(canvas!, 70, 60);
+    dispatchMouseUp(canvas!, 70, 60);
+
+    expect(onProjectChange).toHaveBeenCalledTimes(1);
+    const next = onProjectChange.mock.calls[0][0] as PaperProject;
+    // 指针从 (50,40) 移到 (70,60)，纸片原点同步移动 (20,20)
+    expect(next.elements[0].transform).toEqual({
+      x: 20,
+      y: 20,
+      rotation: 0,
+      scaleX: 1,
+      scaleY: 1,
+    });
+  });
+});
