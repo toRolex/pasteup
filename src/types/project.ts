@@ -26,6 +26,8 @@ export interface PaperElement {
   /** 引用 textures 表；null 表示无纹理 */
   textureId: string | null;
   textureScale: number;
+  /** 程序化纹理 seed（T7）：每张纸独立 → 结构天然不同；重开一致依赖精确持久化。 */
+  seed: number;
   transform: ProjectTransform;
 }
 
@@ -64,6 +66,11 @@ function uid(): string {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
+/** 随机 uint32 seed（0..2³²-1）。种子选择本身可随机；纹理结构确定性由 mulberry32 保证。 */
+function randomSeed(): number {
+  return Math.floor(Math.random() * 0x100000000);
+}
+
 export interface CreatePaperElementInput {
   id?: string;
   path: string;
@@ -71,6 +78,8 @@ export interface CreatePaperElementInput {
   opacity?: number;
   textureId?: string | null;
   textureScale?: number;
+  /** 程序化纹理 seed；未提供时默认随机（每张纸独立）。测试/T12 传显式 seed 保证确定。 */
+  seed?: number;
   transform?: Partial<ProjectTransform>;
 }
 
@@ -84,6 +93,7 @@ export function createPaperElement(input: CreatePaperElementInput): PaperElement
     opacity: input.opacity ?? 1,
     textureId: input.textureId ?? null,
     textureScale: input.textureScale ?? 1,
+    seed: input.seed ?? randomSeed(),
     transform: {
       x: input.transform?.x ?? 0,
       y: input.transform?.y ?? 0,
