@@ -9,6 +9,10 @@ dist-ssr/
 
 # Tauri / Rust
 src-tauri/target/
+src-tauri/gen/schemas/
+
+# 测试
+coverage/
 
 # 原型中间产物（截图等）
 prototypes/**/shot*.png

@@ -1,0 +1,16 @@
+[package]
+name = "pasteup"
+version = "0.1.0"
+description = "手帐剪纸拼贴绘图 app：照片描摹 → 纸片元素 → 拼贴排版 → 导出 PNG/SVG"
+authors = ["pasteup"]
+edition = "2021"
+
+[lib]
+name = "pasteup_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
