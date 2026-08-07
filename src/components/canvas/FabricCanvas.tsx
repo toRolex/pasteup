@@ -6,10 +6,23 @@
  * - 单向向上：fabric 事件（object:modified）→ 显式读取对象属性回灌 onProjectChange。
  * - 不依赖 fabric `toObject()` 默认行为，schema 字段显式读写。
  */
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type MutableRefObject } from 'react';
 import { Canvas } from 'fabric';
 import type { PaperProject } from '../../types/project';
 import { createFabricPath } from '../../fabric/paperFactory';
+import { getZoom, panBy, resetViewport, zoomBy } from '../../fabric/viewport';
+
+/** React→fabric 命令式导航句柄（只承载视口操作，不承载元素读写）。 */
+export interface FabricCanvasApi {
+  /** 按倍率缩放视口，返回新缩放值。 */
+  zoomBy(factor: number): number;
+  /** 视口平移 dx/dy 像素。 */
+  panBy(dx: number, dy: number): void;
+  /** 复位视口：缩放 1、位移 0。 */
+  resetViewport(): void;
+  /** 当前视口缩放。 */
+  getZoom(): number;
+}
 
 export interface FabricCanvasProps {
   project: PaperProject;
@@ -17,6 +30,8 @@ export interface FabricCanvasProps {
   onProjectChange?: (project: PaperProject) => void;
   /** 画布就绪后暴露 fabric.Canvas 实例（供导出、命中测试等扩展用）。 */
   onReady?: (canvas: Canvas) => void;
+  /** 导航句柄（单向向下：React → fabric 视口；fabric 事件仍只经 onProjectChange 回灌）。 */
+  apiRef?: MutableRefObject<FabricCanvasApi | null>;
 }
 
 /** 把 project.elements 命令式推送到 fabric 画布（单向向下）。 */
@@ -64,16 +79,18 @@ function readProjectFromCanvas(canvas: Canvas, previous: PaperProject): PaperPro
   };
 }
 
-export function FabricCanvas({ project, onProjectChange, onReady }: FabricCanvasProps) {
+export function FabricCanvas({ project, onProjectChange, onReady, apiRef }: FabricCanvasProps) {
   const containerElRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<Canvas | null>(null);
   const projectRef = useRef(project);
   const onProjectChangeRef = useRef(onProjectChange);
   const onReadyRef = useRef(onReady);
+  const apiRefRef = useRef(apiRef);
 
   projectRef.current = project;
   onProjectChangeRef.current = onProjectChange;
   onReadyRef.current = onReady;
+  apiRefRef.current = apiRef;
 
   // 挂载：创建 fabric 画布并订阅事件（fabric 拥有画布内部状态）。
   // fabric v7 会把传入的 <canvas> 包进自建 wrapper，因此 React 只持有容器 div，
@@ -95,9 +112,21 @@ export function FabricCanvas({ project, onProjectChange, onReady }: FabricCanvas
       onProjectChangeRef.current?.(next);
     });
 
+    // 导航句柄：仅承载视口操作（单向向下），fabric 事件仍只经 onProjectChange 回灌。
+    const targetApiRef = apiRefRef.current;
+    if (targetApiRef) {
+      targetApiRef.current = {
+        zoomBy: (factor) => zoomBy(canvas, factor),
+        panBy: (dx, dy) => panBy(canvas, dx, dy),
+        resetViewport: () => resetViewport(canvas),
+        getZoom: () => getZoom(canvas),
+      };
+    }
+
     onReadyRef.current?.(canvas);
 
     return () => {
+      if (targetApiRef) targetApiRef.current = null;
       canvas.dispose();
       canvasRef.current = null;
     };

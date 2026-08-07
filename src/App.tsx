@@ -1,30 +1,14 @@
-import { useState } from 'react';
-import { FabricCanvas } from './components/canvas/FabricCanvas';
+import { useRef, useState } from 'react';
+import { FabricCanvas, type FabricCanvasApi } from './components/canvas/FabricCanvas';
+import { NewProjectDialog } from './components/dialogs/NewProjectDialog';
 import { JournalShell } from './styles/journalLayout';
-import {
-  createEmptyProject,
-  createPaperElement,
-  type PaperProject,
-} from './types/project';
-
-/** P0 演示项目：画布上渲染一片带基础样式的纸片。 */
-function createDemoProject(): PaperProject {
-  const project = createEmptyProject(960, 640);
-  project.elements.push(
-    createPaperElement({
-      path: 'M 60 40 Q 180 10 300 70 Q 340 200 260 320 Q 120 380 20 260 Q -20 100 60 40 Z',
-      color: '#7a8b5c',
-      opacity: 0.9,
-      textureId: null,
-      textureScale: 1,
-      transform: { x: 120, y: 90, rotation: 12, scaleX: 1, scaleY: 1 },
-    }),
-  );
-  return project;
-}
+import { useProjectStore } from './store/projectStore';
 
 export default function App() {
-  const [project, setProject] = useState<PaperProject>(createDemoProject);
+  const project = useProjectStore((s) => s.project);
+  const setProject = useProjectStore((s) => s.setProject);
+  const apiRef = useRef<FabricCanvasApi | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   return (
     <div className="app-shell">
@@ -32,6 +16,38 @@ export default function App() {
         topbar={
           <div className="brand">
             <span className="brand-name">pasteup · 手帐剪纸拼贴</span>
+            <button
+              className="tool-btn"
+              data-testid="new-project"
+              onClick={() => setDialogOpen(true)}
+            >
+              新建
+            </button>
+            <span className="brand-spacer" aria-hidden="true" />
+            <button
+              className="tool-btn"
+              data-testid="zoom-out"
+              aria-label="缩小视图"
+              onClick={() => apiRef.current?.zoomBy(0.8)}
+            >
+              −
+            </button>
+            <button
+              className="tool-btn"
+              data-testid="zoom-in"
+              aria-label="放大视图"
+              onClick={() => apiRef.current?.zoomBy(1.25)}
+            >
+              ＋
+            </button>
+            <button
+              className="tool-btn"
+              data-testid="zoom-reset"
+              aria-label="复位视图"
+              onClick={() => apiRef.current?.resetViewport()}
+            >
+              复位
+            </button>
             <span className="tape tape--topbar" aria-hidden="true" />
           </div>
         }
@@ -53,8 +69,9 @@ export default function App() {
           </div>
         }
       >
-        <FabricCanvas project={project} onProjectChange={setProject} />
+        <FabricCanvas project={project} onProjectChange={setProject} apiRef={apiRef} />
       </JournalShell>
+      <NewProjectDialog open={dialogOpen} onClose={() => setDialogOpen(false)} />
       <div className="grain" aria-hidden="true" />
       <div className="fiber" aria-hidden="true" />
     </div>
