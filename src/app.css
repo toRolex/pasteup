@@ -1,43 +1,39 @@
-/* pasteup P0 基础壳样式（视觉方向见 DESIGN.md，后续 wayfinder 再打磨） */
+/* pasteup 全局基础：桌面裁切垫 + 墨迹排版（视觉方向见 DESIGN.md / 03-open-journal）。
+   token 与拟物基建分别在 styles/tokens.css、styles/journal.css。 */
 * {
   box-sizing: border-box;
 }
 
+html,
 body {
   margin: 0;
-  font-family: 'Nunito', 'Hiragino Maru Gothic ProN', system-ui, sans-serif;
-  background: #c9bca6; /* desk */
-  color: #5a4634; /* ink */
+  padding: 0;
+}
+
+body {
+  height: 100vh;
+  overflow: hidden;
+  background: var(--desk);
+  background-image: radial-gradient(circle, rgba(90, 70, 52, 0.08) 1px, transparent 1.6px);
+  background-size: 26px 26px;
+  font-family: var(--font-body);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font-family: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
 }
 
 .app-shell {
-  display: flex;
-  flex-direction: column;
-  min-height: 100vh;
-}
-
-.app-title {
-  height: 56px;
-  display: flex;
-  align-items: center;
-  padding: 0 20px;
-  background: #f7f0e0; /* bg */
-  border-bottom: 1px solid rgba(90, 70, 52, 0.15);
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  user-select: none;
-}
-
-.app-canvas {
-  flex: 1;
+  height: 100vh;
+  padding: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
-}
-
-.app-canvas [data-testid='fabric-canvas'] {
-  background: #f7f0e0; /* bg（内页纸） */
-  border-radius: 6px;
-  box-shadow: 0 8px 24px rgba(90, 70, 52, 0.18);
 }

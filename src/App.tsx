@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { FabricCanvas } from './components/canvas/FabricCanvas';
+import { JournalShell } from './styles/journalLayout';
 import {
   createEmptyProject,
   createPaperElement,
@@ -27,10 +28,35 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <header className="app-title">pasteup · 手帐剪纸拼贴</header>
-      <main className="app-canvas">
+      <JournalShell
+        topbar={
+          <div className="brand">
+            <span className="brand-name">pasteup · 手帐剪纸拼贴</span>
+            <span className="tape tape--topbar" aria-hidden="true" />
+          </div>
+        }
+        leftPage={
+          <div className="page-scaffold">
+            <h2 className="page-heading">目录</h2>
+            <div className="sticky-note">
+              <p className="note-text">左页待承载：手绘目录 / 工具 / 图层</p>
+            </div>
+          </div>
+        }
+        rightPage={
+          <div className="page-scaffold">
+            <h2 className="page-heading">色卡</h2>
+            <div className="torn-paper">
+              <span className="note-text">右页待承载：色板 / 纹理 / 属性便签</span>
+            </div>
+            <span className="stamp">已装订</span>
+          </div>
+        }
+      >
         <FabricCanvas project={project} onProjectChange={setProject} />
-      </main>
+      </JournalShell>
+      <div className="grain" aria-hidden="true" />
+      <div className="fiber" aria-hidden="true" />
     </div>
   );
 }

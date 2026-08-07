@@ -1,0 +1,61 @@
+/* 字体资产本地打包（OFL 1.1，src/assets/fonts/，经 Vite）。
+   - 离线优先：字体进 bundle，不运行时走 CDN，启动无字体请求外发。
+   - 中文标题由打包的 Ma Shan Zheng（主标题手写）/ ZCOOL KuaiLe（副标）保证 macOS / Windows
+     双平台一致；中文正文不打包——macOS 系统 Hiragino Maru Gothic ProN、Windows 兜底 Microsoft YaHei。
+   - 许可：见 src/assets/fonts/OFL.txt 与 OFL-<Family>.txt。 */
+
+@font-face {
+  font-family: 'Caveat';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('../assets/fonts/caveat-600.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'ZCOOL KuaiLe';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../assets/fonts/zcool-kuaile-400.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Nunito';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../assets/fonts/nunito-400.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Nunito';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('../assets/fonts/nunito-600.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Nunito';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('../assets/fonts/nunito-700.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Ma Shan Zheng';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../assets/fonts/ma-shan-zheng-400.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Liu Jian Mao Cao';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../assets/fonts/liu-jian-mao-cao-400.woff2') format('woff2');
+}

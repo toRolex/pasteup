@@ -1,0 +1,57 @@
+/* pasteup 设计 token —— DESIGN.md 契约的 CSS 变量版（与 tokens.ts 同源）。
+   三栏布局尺寸由 JournalShell 从 tokens.ts 经 inline style 下发（可测）；此处暴露同名
+   CSS 变量供样式层取用。视觉语言来自「03 摊开手帐本」原型。 */
+
+:root {
+  /* Palette（DESIGN.md Palette，全 OKLCH） */
+  --desk: oklch(0.80 0.025 88);
+  --bg: oklch(0.965 0.020 85);
+  --paper-2: oklch(0.935 0.022 85);
+  --paper-deep: oklch(0.905 0.025 85);
+  --ink: oklch(0.32 0.045 60);
+  --ink-soft: oklch(0.46 0.04 60);
+  --ink-line: oklch(0.32 0.045 60 / 0.38);
+  --moss: oklch(0.55 0.092 130);
+  --moss-deep: oklch(0.48 0.075 130);
+  --tape: oklch(0.53 0.175 27);
+  --note: oklch(0.82 0.10 88);
+  --note-deep: oklch(0.75 0.11 86);
+  --sticker: oklch(0.55 0.05 320);
+
+  /* Layout 三栏（DESIGN.md Layout） */
+  --topbar-h: 56px;
+  --left-w: 260px;
+  --spine-w: 34px;
+  --right-w: 280px;
+
+  /* Radius（DESIGN.md Radius：拟物零大圆角） */
+  --radius-chip: 4px;
+  --radius-tool: 6px;
+  --radius-stamp: 0px;
+
+  /* Elevation（DESIGN.md Elevation） */
+  --shadow-book: 0 10px 40px oklch(0.25 0.03 60 / 0.25), 0 2px 8px oklch(0.25 0.03 60 / 0.15);
+  --shadow-lift: 0 4px 10px oklch(0.25 0.03 60 / 0.18);
+  --shadow-hover: 0 6px 14px oklch(0.25 0.03 60 / 0.25);
+
+  /* Motion（DESIGN.md Motion） */
+  --motion-duration: 220ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Fonts（DESIGN.md Typography 字体链，本地打包 + 系统兜底） */
+  --font-hand: 'Ma Shan Zheng', 'Caveat', 'Kaiti SC', cursive;
+  --font-scrawl: 'Liu Jian Mao Cao', 'Kaiti SC', cursive;
+  --font-sub: 'ZCOOL KuaiLe', 'PingFang SC', sans-serif;
+  --font-num: 'Nunito', 'PingFang SC', sans-serif;
+  --font-body: 'Nunito', 'Hiragino Maru Gothic ProN', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+/* prefers-reduced-motion：动效 token 降级为瞬时切换（DESIGN.md Motion） */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-duration: 0.001s;
+    --ease-out: linear;
+    --ease-spring: linear;
+  }
+}
