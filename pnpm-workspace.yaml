@@ -1,0 +1,6 @@
+# pnpm 11 设置
+# esbuild: vite/vitest 依赖其平台二进制，放行构建脚本
+# canvas: fabric 的 node 可选依赖（node-canvas），本项目用 jsdom + 2D context stub，无需原生编译
+allowBuilds:
+  esbuild: true
+  canvas: false
