@@ -1,0 +1,32 @@
+{
+  "name": "pasteup",
+  "private": true,
+  "version": "0.1.0",
+  "description": "手帐剪纸拼贴绘图 app：照片描摹 → 纸片元素 → 拼贴排版 → 导出 PNG/SVG",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "fabric": "^7.4.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "zustand": "^5.0.14"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.3.2",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.5.2",
+    "jsdom": "^26.1.0",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5",
+    "vitest": "^3.2.4"
+  }
+}
