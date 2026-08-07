@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   FabricCanvas,
   type FabricCanvasApi,
@@ -12,13 +12,30 @@ import { useProjectStore } from './store/projectStore';
 
 export default function App() {
   const project = useProjectStore((s) => s.project);
-  const setProject = useProjectStore((s) => s.setProject);
+  const commitProject = useProjectStore((s) => s.commitProject);
+  const undo = useProjectStore((s) => s.undo);
+  const redo = useProjectStore((s) => s.redo);
   const setBackgroundPhoto = useProjectStore((s) => s.setBackgroundPhoto);
+  const toggleBackgroundPhoto = useProjectStore((s) => s.toggleBackgroundPhoto);
   const bgPhoto = project.bgPhoto;
   const apiRef = useRef<FabricCanvasApi | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const { activate: activatePicker } = useScreenPicker();
   const [tool, setTool] = useState<FabricTool>('select');
+
+  // 撤销/重做快捷键：Cmd/Ctrl+Z 撤销，Shift+Cmd/Ctrl+Z 重做。
+  // MVP 无输入框场景，做全局 keydown 处理；T10 属性面板接入输入框时再细化跳过聚焦场景。
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const mod = e.metaKey || e.ctrlKey;
+      if (!mod || e.key.toLowerCase() !== 'z') return;
+      e.preventDefault();
+      if (e.shiftKey) redo();
+      else undo();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [undo, redo]);
 
   return (
     <div className="app-shell">
@@ -58,6 +75,24 @@ export default function App() {
             >
               描绘
             </button>
+            <button
+              className="tool-btn"
+              data-testid="undo"
+              aria-label="撤销"
+              title="撤销（⌘/Ctrl+Z）"
+              onClick={() => undo()}
+            >
+              撤销
+            </button>
+            <button
+              className="tool-btn"
+              data-testid="redo"
+              aria-label="重做"
+              title="重做（⇧⌘/Ctrl+Z）"
+              onClick={() => redo()}
+            >
+              重做
+            </button>
             <span className="brand-spacer" aria-hidden="true" />
             <button
               className="tool-btn"
@@ -84,7 +119,7 @@ export default function App() {
               <button
                 className="tool-btn"
                 data-testid="toggle-bg"
-                onClick={() => setProject({ ...project, bgPhoto: { ...bgPhoto, visible: !bgPhoto.visible } })}
+                onClick={() => toggleBackgroundPhoto()}
               >
                 {bgPhoto.visible ? '隐藏底图' : '显示底图'}
               </button>
@@ -131,7 +166,7 @@ export default function App() {
           </div>
         }
       >
-        <FabricCanvas project={project} onProjectChange={setProject} apiRef={apiRef} activeTool={tool} />
+        <FabricCanvas project={project} onProjectChange={commitProject} apiRef={apiRef} activeTool={tool} />
       </JournalShell>
       <NewProjectDialog open={dialogOpen} onClose={() => setDialogOpen(false)} />
       <div className="grain" aria-hidden="true" />

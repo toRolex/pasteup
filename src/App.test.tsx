@@ -11,7 +11,7 @@ const normalize = (s: string) => s.replace(/\s+/g, '');
 
 describe('App 集成（seam S3）— 三栏骨架 + store 驱动的画布', () => {
   beforeEach(() => {
-    useProjectStore.setState({ project: createDefaultProject() });
+    useProjectStore.setState({ project: createDefaultProject(), undoStack: [], redoStack: [] });
   });
 
   it('渲染三栏骨架，grid 尺寸 56 / 260 / 34 / 280', () => {
@@ -75,5 +75,63 @@ describe('App 集成（seam S3）— 三栏骨架 + store 驱动的画布', () =
     fireEvent.click(selectBtn);
     expect(selectBtn).toHaveAttribute('aria-pressed', 'true');
     expect(traceBtn).toHaveAttribute('aria-pressed', 'false');
+  });
+});
+
+describe('App 撤销/重做（T9 seam U7）— 顶栏按钮 + 快捷键', () => {
+  beforeEach(() => {
+    useProjectStore.setState({
+      project: createDefaultProject(),
+      undoStack: [],
+      redoStack: [],
+    });
+  });
+
+  it('顶栏提供撤销/重做按钮', () => {
+    render(<App />);
+    expect(screen.getByTestId('undo')).toBeInTheDocument();
+    expect(screen.getByTestId('redo')).toBeInTheDocument();
+  });
+
+  it('集成：底图开关后点撤销按钮恢复 visible、点重做按钮再次隐藏', () => {
+    useProjectStore.setState({
+      project: {
+        ...useProjectStore.getState().project,
+        bgPhoto: { dataUrl: 'data:image/png;base64,AA', visible: true },
+      },
+    });
+    render(<App />);
+
+    fireEvent.click(screen.getByTestId('toggle-bg')); // visible → false（走撤销历史）
+    expect(useProjectStore.getState().project.bgPhoto?.visible).toBe(false);
+
+    fireEvent.click(screen.getByTestId('undo'));
+    expect(useProjectStore.getState().project.bgPhoto?.visible).toBe(true);
+
+    fireEvent.click(screen.getByTestId('redo'));
+    expect(useProjectStore.getState().project.bgPhoto?.visible).toBe(false);
+  });
+
+  it('快捷键 Ctrl/Cmd+Z 触发撤销、Shift+Ctrl/Cmd+Z 触发重做', () => {
+    useProjectStore.setState({
+      project: {
+        ...useProjectStore.getState().project,
+        bgPhoto: { dataUrl: 'data:image/png;base64,AA', visible: true },
+      },
+    });
+    render(<App />);
+
+    fireEvent.click(screen.getByTestId('toggle-bg')); // visible → false
+    expect(useProjectStore.getState().project.bgPhoto?.visible).toBe(false);
+
+    fireEvent.keyDown(window, { key: 'z', ctrlKey: true });
+    expect(useProjectStore.getState().project.bgPhoto?.visible).toBe(true);
+
+    fireEvent.keyDown(window, { key: 'z', ctrlKey: true, shiftKey: true });
+    expect(useProjectStore.getState().project.bgPhoto?.visible).toBe(false);
+
+    // Cmd（metaKey）同样生效
+    fireEvent.keyDown(window, { key: 'z', metaKey: true });
+    expect(useProjectStore.getState().project.bgPhoto?.visible).toBe(true);
   });
 });

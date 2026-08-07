@@ -2,8 +2,10 @@
  * 当前项目单一来源（Zustand）。
  *
  * 架构（issue #26 / implementation-plan §3.1）：React store 变化 → 命令式推送到 fabric；
- * fabric 事件 → 经桥接壳 onProjectChange 回灌 store.setProject（单向通信，不双向绑定）。
- * T4–T17 将在此 store 上持续扩展（底图 / 纸片数组 / 撤销栈等）。
+ * fabric 事件 → 经桥接壳 onProjectChange 回灌 store（单向通信，不双向绑定）。
+ * T9（issue #32）：撤销/重做基建——所有编辑操作走统一入口 commitProject（push 编辑前
+ * 快照到 undoStack、清空 redoStack）；undo/redo 内部用 setProject 恢复（不再 push 栈）。
+ * setProject 保留为原始回灌/恢复通道，不写撤销历史。
  */
 import { create } from 'zustand';
 import {
@@ -23,13 +25,25 @@ import {
 export interface ProjectStore {
   /** 当前项目（画布尺寸 / 底图 / 纸片 / 纹理）。 */
   project: PaperProject;
-  /** 新建项目：按朝向 + 分辨率初始化 A4 画布，内容字段重置为空。 */
+  /** 撤销栈：每次编辑 push「编辑前」项目快照（栈顶 = 最近一次编辑前状态）。 */
+  undoStack: PaperProject[];
+  /** 重做栈：undo 时把当前状态 push 进来；新编辑（栈顶变更）后清空。 */
+  redoStack: PaperProject[];
+  /** 新建项目：按朝向 + 分辨率初始化 A4 画布，内容字段重置为空，撤销/重做历史清空。 */
   createProject: (orientation: CanvasOrientation, resolution: CanvasResolution) => void;
-  /** 替换当前项目（fabric 事件回灌通道；T4+ 撤销栈会包一层）。 */
+  /** 替换当前项目（原始回灌/恢复通道；不写撤销历史——undo/redo 内部用它恢复）。 */
   setProject: (project: PaperProject) => void;
-  /** 设置或清除底图照片。 */
+  /** 统一编辑入口：push 编辑前快照到 undoStack、清空 redoStack，然后替换项目。 */
+  commitProject: (project: PaperProject) => void;
+  /** 撤销：空栈 no-op；把当前状态 push 到 redoStack，恢复 undoStack 栈顶快照。 */
+  undo: () => void;
+  /** 重做：空栈 no-op；把当前状态 push 到 undoStack，恢复 redoStack 栈顶快照。 */
+  redo: () => void;
+  /** 设置或清除底图照片（走撤销历史）。 */
   setBackgroundPhoto: (dataUrl: string | null) => void;
-  /** 追加一个描摹闭合的纸片到 elements 末尾（数组序即 z 序，后画在上层）。 */
+  /** 切换底图可见性（走撤销历史）；无底图时 no-op。 */
+  toggleBackgroundPhoto: () => void;
+  /** 追加一个描摹闭合的纸片到 elements 末尾（数组序即 z 序，后画在上层；走撤销历史）。 */
   addPaper: (path: string, color?: string) => void;
 }
 
@@ -47,20 +61,83 @@ export function createDefaultProject(): PaperProject {
   return createProjectFrom(DEFAULT_CANVAS_ORIENTATION, DEFAULT_CANVAS_RESOLUTION);
 }
 
+/**
+ * 项目快照（结构浅拷贝）：project 含嵌套数组与对象（dataURL 字符串、bgPhoto、textures、
+ * elements），栈内快照须与新状态隔离——复制容器与嵌套普通对象，元素对象可复用引用
+ * （全部编辑走不可变更新，不原地修改元素，故引用共享安全）。
+ */
+function snapshotProject(project: PaperProject): PaperProject {
+  return {
+    ...project,
+    canvas: { ...project.canvas },
+    bgPhoto: project.bgPhoto ? { ...project.bgPhoto } : null,
+    textures: project.textures.map((t) => ({ ...t })),
+    elements: project.elements.map((e) => ({ ...e, transform: { ...e.transform } })),
+  };
+}
+
+/**
+ * 统一编辑提交：push 编辑前快照到 undoStack、清空 redoStack（栈顶变更）、替换 project。
+ * 传同一对象引用视为 no-op（避免回灌空提交）。
+ */
+function commitEdit(
+  state: ProjectStore,
+  next: PaperProject,
+): Partial<ProjectStore> {
+  if (state.project === next) return {};
+  return {
+    project: next,
+    undoStack: [...state.undoStack, snapshotProject(state.project)],
+    redoStack: [],
+  };
+}
+
 export const useProjectStore = create<ProjectStore>()((set) => ({
   project: createDefaultProject(),
+  undoStack: [],
+  redoStack: [],
   createProject: (orientation, resolution) =>
-    set({ project: createProjectFrom(orientation, resolution) }),
+    set({ project: createProjectFrom(orientation, resolution), undoStack: [], redoStack: [] }),
   setProject: (project) => set({ project }),
+  commitProject: (next) => set((state) => commitEdit(state, next)),
+  undo: () =>
+    set((state) => {
+      const prev = state.undoStack[state.undoStack.length - 1];
+      if (!prev) return {};
+      return {
+        project: prev,
+        undoStack: state.undoStack.slice(0, -1),
+        redoStack: [...state.redoStack, snapshotProject(state.project)],
+      };
+    }),
+  redo: () =>
+    set((state) => {
+      const next = state.redoStack[state.redoStack.length - 1];
+      if (!next) return {};
+      return {
+        project: next,
+        redoStack: state.redoStack.slice(0, -1),
+        undoStack: [...state.undoStack, snapshotProject(state.project)],
+      };
+    }),
   setBackgroundPhoto: (dataUrl) =>
-    set((state) => ({
-      project: { ...state.project, bgPhoto: dataUrl ? { dataUrl, visible: true } : null },
-    })),
+    set((state) =>
+      commitEdit(state, {
+        ...state.project,
+        bgPhoto: dataUrl ? { dataUrl, visible: true } : null,
+      }),
+    ),
+  toggleBackgroundPhoto: () =>
+    set((state) => {
+      const bg = state.project.bgPhoto;
+      if (!bg) return {};
+      return commitEdit(state, { ...state.project, bgPhoto: { ...bg, visible: !bg.visible } });
+    }),
   addPaper: (path, color = DEFAULT_PAPER_COLOR) =>
-    set((state) => ({
-      project: {
+    set((state) =>
+      commitEdit(state, {
         ...state.project,
         elements: [...state.project.elements, createPaperElement({ path, color })],
-      },
-    })),
+      }),
+    ),
 }));
