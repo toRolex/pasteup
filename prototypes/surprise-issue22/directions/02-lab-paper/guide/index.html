@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="icon" href="data:," />
+<title>guide · 02 活纹理 LAB PAPER</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&family=Nunito:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root { --paper:#F0E8D7; --moss:#7A8B5C; --moss-deep:#5F6E45; --brown:#A8845A; --ink:#5A4634; --sand:#D9C9A8; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:'Nunito','PingFang SC',sans-serif; font-size:14px; line-height:1.75; color:var(--ink);
+    background:linear-gradient(180deg,#F7F0E0 0%,#EDE3CD 100%); min-height:100vh; }
+  .wrap { max-width:760px; margin:0 auto; padding:48px 28px 80px; }
+  .brand { font-family:'ZCOOL KuaiLe','PingFang SC',sans-serif; font-size:19px; color:var(--moss-deep); margin-bottom:36px; }
+  .brand a { color:var(--moss-deep); text-decoration:none; }
+  h1 { font-family:'ZCOOL KuaiLe','PingFang SC',sans-serif; font-size:clamp(28px,5vw,40px); font-weight:400; color:var(--moss-deep); margin-bottom:6px; }
+  .sub { font-family:'IBM Plex Mono',monospace; font-size:13px; color:var(--brown); margin-bottom:30px; }
+  .block { background:rgba(247,240,224,.82); border:1px solid rgba(122,139,92,.20); border-radius:12px; padding:22px 24px; margin-bottom:22px; }
+  .block h2 { font-family:'IBM Plex Mono',monospace; font-size:15px; font-weight:500; color:var(--moss-deep); margin-bottom:12px; letter-spacing:.02em; }
+  .block p { margin-bottom:10px; }
+  .block ul { padding-left:20px; }
+  .block li { margin-bottom:8px; }
+  code { font-family:'IBM Plex Mono',monospace; font-size:12.5px; background:rgba(122,139,92,.12); padding:1px 6px; border-radius:5px; color:#5F6E45; }
+  pre { background:#3A3F32; color:#EDF0E0; border-radius:10px; padding:16px 18px; font-size:12.5px; line-height:1.6; overflow-x:auto; margin:10px 0; }
+  pre code { background:none; color:inherit; padding:0; }
+  .tag { display:inline-block; font-size:11px; font-weight:700; color:#F8F8F2; background:var(--moss); border-radius:999px; padding:3px 10px; margin-right:6px; margin-bottom:6px; }
+  .back { display:inline-block; margin-top:8px; font-weight:700; color:var(--moss-deep); text-decoration:none; }
+  .back:hover { text-decoration:underline; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand"><a href="../">← 活纹理</a></div>
+  <h1>活纹理 · LAB PAPER</h1>
+  <div class="sub">how it was built — 纸张实验室构建记录</div>
+
+  <div class="block">
+    <h2>收到的 brief</h2>
+    <p>把 6 种程序纹理（褶皱 / 水彩晕染 / 颗粒 / 织物拉丝 / 大理石纹 / 纤维）做成活的：每个纹理磁贴和纸片填充都用 canvas 实时生成、seed 随机，界面是一间"纸张实验室"。<span class="tag">canvas 程序纹理</span><span class="tag">能力轴：canvas 程序纹理</span></p>
+    <p><b>要 prove 的一件事</b>：6 种纹理全部程序化实时生成且"结构随机、颜色稳定"——同一纹理换 seed 结构就变，但换颜色纹理不串色。直接证明 issue #22 的 wayfinder #9/#10 决策在视觉上成立。</p>
+  </div>
+
+  <div class="block">
+    <h2>签名技法</h2>
+    <ul>
+      <li><b>手写 Value Noise + fBm</b>：6 个生成器共享确定性噪声基元 <code>hash2 → valueNoise → fbm</code>，签名 <code>(seed, style, scale) → 灰度明度层</code>，与颜色解耦。</li>
+      <li><b>seed 驱动随机 + 结构哈希（ST）</b>：luma 经 FNV 哈希折叠成 4 位 hex「ST 结构哈希」，与「CH 色值」分开展示。</li>
+      <li><b>每纸片独立 re-seed</b>：seed 刷新按钮 / 全部重取样 / 双击画布空白取样新纸片。</li>
+      <li><b>纹理缩放 50–200% + 旋转 90° 实时重合成</b>（防抖 70ms）。</li>
+      <li><b>数值读数动效</b>：<code>monoJump</code> tick + odometer 式 <code>rollValue</code> 逐字符级联。</li>
+      <li><b>对照实验便签</b>：同一 seed、两色并排渲染，ST 哈希一致，直观证明色/结构解耦。</li>
+      <li><b>实验室叙事</b>：坐标纸底、描摹叶线幽灵、光标读数、norm L 光值、ms/帧 合成耗时、连点 5 次触发"实验室自检"彩蛋。</li>
+    </ul>
+  </div>
+
+  <div class="block">
+    <h2>真实代码摘录</h2>
+    <pre><code>// 确定性噪声基元：同一 (seed, x, y) 永远返回同一值
+function hash2(x, y, seed) {
+  const h = (Math.sin(x * 127.1 + y * 311.7 + seed * 74.7) * 43758.5453);
+  return h - Math.floor(h);
+}
+function fbm(x, y, seed, oct = 4, lac = 2, gain = 0.5) {
+  let sum = 0, amp = 0.5, f = 1;
+  for (let i = 0; i &lt; oct; i++) {
+    sum += valueNoise(x * f, y * f, seed + i * 1013) * amp;
+    f *= lac; amp *= gain;
+  }
+  return sum;
+}</code></pre>
+  </div>
+
+  <div class="block">
+    <h2>资产来源</h2>
+    <p>零外部位图。全部 6 种纹理为手写 canvas 噪声算法生成；字体走 Google Fonts（ZCOOL KuaiLe / Nunito / IBM Plex Mono）。</p>
+  </div>
+
+  <div class="block">
+    <h2>批判循环发现与改动</h2>
+    <ul>
+      <li><b>颜色稳定 = 架构保证</b>：生成器只输出灰度 luma，上色在最后一步 <code>luma × 色</code> 完成。换色必然不改变结构，这是架构保证而非 UI 技巧。</li>
+      <li><b>画布尺寸策略</b>：纸片按 <code>w·dpr</code>（封顶 1.5）生成，luma 按参数 key 缓存（LRU 26 项），滑块只重算受影响纸片。</li>
+      <li><b>移动端 fit 缩放</b>：内容坐标系固定 900×770，按 <code>min(planeW/900, planeH/770)</code> 自适应，390px 不塌。</li>
+      <li><b>对比度</b>：正文墨褐 7.3:1、辅助 mono 5.6:1、主按钮深苔绿白字 4.8:1。</li>
+    </ul>
+  </div>
+
+  <div class="block">
+    <h2>验证结果</h2>
+    <p>console errors：<b>0</b>（desktop/mobile 双视口 harness 实测）。prove 断言：换色时 <code>ST 1AB8</code> 不变、<code>CH</code> 变；重取样 <code>ST→BFAA</code>；对照实验同 seed 异色均 <code>ST 0xBF27</code>。结构随机、颜色稳定成立。</p>
+    <p>截图：<code>shots/desktop-top/mid/bottom.png</code>、<code>shots/mobile-top/bottom.png</code>。</p>
+    <a class="back" href="../">回到原型 →</a>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>pasteup · 碎纸拼贴 SCRAP MOTION</title>
+<meta name="description" content="pasteup 手帐剪纸拼贴 —— 纸片解构、飘动、重组的拼贴过程原型" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M14 6 4 20l8-1 2 7 6-14 7 2L18 4Z' fill='%23D68A55'/%3E%3C/svg%3E" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Nunito:wght@400;700;800&family=ZCOOL+KuaiLe&display=swap" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/CustomEase.min.js"></script>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div class="app" id="app">
+
+  <!-- ═══════════ 顶栏 56px ═══════════ -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 32 32" width="20" height="20"><path d="M16 4 5 20l9-1 2 8 7-15 8 2L21 4Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/></svg>
+      </span>
+      <span class="brand-name">pasteup</span>
+      <span class="brand-sub">碎纸拼贴 SCRAP</span>
+    </div>
+
+    <div class="doc-title" role="group" aria-label="文档信息">
+      <span class="doc-name">未命名拼贴</span>
+      <span class="doc-meta">· 第 3 张 · 已保存</span>
+    </div>
+
+    <div class="top-actions">
+      <button class="btn btn-ghost" id="btnUndo" aria-label="撤销">
+        <svg viewBox="0 0 20 20" width="16" height="16"><path d="M7 5 3 9l4 4M4 9h7a4 4 0 0 1 0 8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>撤销</span>
+      </button>
+      <button class="btn btn-ghost" id="btnRedo" aria-label="重做">
+        <svg viewBox="0 0 20 20" width="16" height="16"><path d="M13 5l4 4-4 4M16 9H9a4 4 0 0 0 0 8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>重做</span>
+      </button>
+      <span class="top-sep" aria-hidden="true"></span>
+      <button class="btn btn-play" id="btnDemo" aria-label="演示纸片解构与重组的动效">
+        <svg viewBox="0 0 20 20" width="15" height="15"><path d="M6 4v12l10-6Z" fill="currentColor"/></svg>
+        <span>演示动效</span>
+      </button>
+      <span class="top-sep" aria-hidden="true"></span>
+      <button class="btn btn-outline" id="btnExportPng">导出 PNG</button>
+      <button class="btn btn-primary" id="btnExportSvg">
+        <svg viewBox="0 0 20 20" width="15" height="15"><path d="M10 2v10m0 0 4-4m-4 4L6 8M4 15h12v3H4Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>导出 SVG</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ═══════════ 工作区 ═══════════ -->
+  <div class="workspace">
+
+    <!-- ─────────── 左栏 260px ─────────── -->
+    <aside class="panel panel-left" aria-label="工具与图层">
+      <section class="panel-sec" aria-labelledby="toolsTitle">
+        <h2 class="sec-title" id="toolsTitle">工具 <span class="sec-note">6</span></h2>
+        <div class="tool-grid" role="group" aria-label="绘图工具">
+          <button class="tool" data-tool="move" aria-label="移动工具">
+            <svg viewBox="0 0 24 24" width="20" height="20"><path d="M12 3v14m0 0 4-4m-4 4-4-4M5 9l7-6 7 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span>移动</span>
+          </button>
+          <button class="tool is-on" data-tool="trace" aria-pressed="true" aria-label="描摹工具">
+            <svg viewBox="0 0 24 24" width="20" height="20"><path d="M4 18c3-2 5 2 8 0s5-4 8-2M5 12c2-1 4 1 6 0s4-1 5 0M6 7c2 0 3 1 5 0s3-1 4 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            <span>描摹</span>
+          </button>
+          <button class="tool" data-tool="scrap" aria-label="生成纸片">
+            <svg viewBox="0 0 24 24" width="20" height="20"><path d="M6 8c3-2 6-2 9 0s4 2 5 0M7 13c2-1 4-1 6 0s3 1 4 0M8 18c2-1 4-1 6 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M12 4 6 16l4-1 2 6 3-9 4 1Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+            <span>纸片</span>
+          </button>
+          <button class="tool" data-tool="eraser" aria-label="橡皮擦">
+            <svg viewBox="0 0 24 24" width="20" height="20"><path d="M8 5h9v14H8zM8 10 4 15l4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+            <span>橡皮</span>
+          </button>
+          <button class="tool" data-tool="picker" aria-label="吸管取色">
+            <svg viewBox="0 0 24 24" width="20" height="20"><path d="M15 5l4 4-8 8-4-4zM11 9 7 5M16 6l3 3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M14 14l-4 7h7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            <span>吸管</span>
+          </button>
+          <button class="tool" data-tool="rotate" aria-label="旋转工具">
+            <svg viewBox="0 0 24 24" width="20" height="20"><path d="M19 8a8 8 0 1 0 1 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M19 3v5h-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span>旋转</span>
+          </button>
+        </div>
+      </section>
+
+      <section class="panel-sec" aria-labelledby="layersTitle">
+        <div class="sec-row">
+          <h2 class="sec-title" id="layersTitle">图层 <span class="sec-note">4</span></h2>
+          <button class="icon-btn" id="btnNewScrap" aria-label="新建纸片">
+            <svg viewBox="0 0 20 20" width="15" height="15"><path d="M10 4v12M4 10h12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          </button>
+        </div>
+        <ul class="layer-list" id="layerList" role="list" aria-label="图层列表">
+          <li class="layer is-selected" data-layer="maple" role="listitem" tabindex="0" aria-label="纸片 枫叶，选中，可拖动排序">
+            <span class="layer-grip" aria-hidden="true">⠿</span>
+            <span class="layer-dot" style="background:#D68A55"></span>
+            <span class="layer-name">纸片 · 枫叶</span>
+            <span class="layer-kind" aria-hidden="true">片</span>
+          </li>
+          <li class="layer" data-layer="bird" role="listitem" tabindex="0" aria-label="纸片 小鸟，可拖动排序">
+            <span class="layer-grip" aria-hidden="true">⠿</span>
+            <span class="layer-dot" style="background:#F0C75E"></span>
+            <span class="layer-name">纸片 · 小鸟</span>
+            <span class="layer-kind" aria-hidden="true">片</span>
+          </li>
+          <li class="layer" data-layer="moon" role="listitem" tabindex="0" aria-label="纸片 月亮，可拖动排序">
+            <span class="layer-grip" aria-hidden="true">⠿</span>
+            <span class="layer-dot" style="background:#B9A4C6"></span>
+            <span class="layer-name">纸片 · 月亮</span>
+            <span class="layer-kind" aria-hidden="true">片</span>
+          </li>
+          <li class="layer is-locked" data-layer="base" role="listitem" tabindex="-1" aria-label="底图 描摹稿，已锁定">
+            <span class="layer-grip" aria-hidden="true">🔒</span>
+            <span class="layer-dot" style="background:#8C7A66"></span>
+            <span class="layer-name">底图 · 描摹稿</span>
+            <span class="layer-kind" aria-hidden="true">图</span>
+          </li>
+        </ul>
+        <p class="layer-hint">拖住 <span class="kbd">⠿</span> 给纸片换层，纸片会被风掀起翻面</p>
+      </section>
+
+      <div class="scrap-corner" aria-hidden="true">
+        <span class="scrap-corner-label">碎纸角 · 新纸片在这裁</span>
+        <div class="scrap-pile">
+          <i style="--sc:#D68A55;--rot:-8deg"></i>
+          <i style="--sc:#F0C75E;--rot:6deg"></i>
+          <i style="--sc:#B9A4C6;--rot:-3deg"></i>
+          <i style="--sc:#7A8B5C;--rot:11deg"></i>
+          <i style="--sc:#EDE4D0;--rot:-12deg"></i>
+          <i style="--sc:#D68A55;--rot:5deg"></i>
+          <i style="--sc:#5A4634;--rot:-6deg"></i>
+          <i style="--sc:#F0C75E;--rot:13deg"></i>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ─────────── 中画布 ─────────── -->
+    <main class="stage" id="stage" aria-label="拼贴画布">
+      <svg class="trace-sheet" id="traceSheet" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+        <path class="trace-shape" d="M50 16 C63 26 67 42 58 54 C68 62 71 78 61 88 L39 88 C29 78 32 62 42 54 C33 42 37 26 50 16Z"/>
+        <path class="trace-shape" d="M66 30 C74 36 76 46 72 54 C68 62 60 66 56 60 C60 54 64 50 66 44 C62 38 60 34 66 30Z"/>
+        <circle class="trace-shape" cx="34" cy="34" r="11"/>
+        <path class="trace-line" d="M12 12 H88 M12 20 H60 M30 88 H84"/>
+        <text class="trace-label" x="16" y="82">描摹稿</text>
+      </svg>
+
+      <!-- 纸片元素 -->
+      <div class="piece" id="piece-maple" data-piece="maple" role="button" tabindex="0" aria-label="纸片 枫叶，可拖动">
+        <svg viewBox="-52 -52 104 104" width="180" height="180" aria-hidden="true">
+          <defs>
+            <pattern id="tex-maple" patternUnits="userSpaceOnUse" width="140" height="140" patternTransform="scale(1)">
+              <image href="" width="140" height="140"/>
+            </pattern>
+            <filter id="rough-maple" x="-12%" y="-12%" width="124%" height="124%">
+              <feTurbulence type="fractalNoise" baseFrequency="0.05 0.10" numOctaves="3" seed="7" result="n"/>
+              <feDisplacementMap in="SourceGraphic" in2="n" scale="2.6" xChannelSelector="R" yChannelSelector="G"/>
+            </filter>
+          </defs>
+          <g filter="url(#rough-maple)">
+            <path id="leafShape" d="M0,-44 C12,-34 16,-14 8,-2 C17,4 19,20 10,30 C13,37 10,43 3,47 L-3,47 C-10,43 -13,37 -10,30 C-19,20 -17,4 -8,-2 C-16,-14 -12,-34 0,-44Z"/>
+            <use href="#leafShape" fill="#D68A55"/>
+            <use href="#leafShape" fill="url(#tex-maple)" opacity="0.34"/>
+            <path d="M0,-32 C-2,-20 -2,-8 0,4 C2,-8 2,-20 0,-32Z M0,-16 C-7,-12 -11,-6 -13,0 M0,-6 C6,-4 12,-2 16,3" stroke="#A85F33" stroke-width="2" fill="none" opacity="0.55" stroke-linecap="round"/>
+          </g>
+        </svg>
+        <span class="piece-tag">枫叶</span>
+      </div>
+
+      <div class="piece" id="piece-bird" data-piece="bird" role="button" tabindex="0" aria-label="纸片 小鸟，可拖动">
+        <svg viewBox="-52 -44 104 88" width="160" height="140" aria-hidden="true">
+          <defs>
+            <pattern id="tex-bird" patternUnits="userSpaceOnUse" width="140" height="140" patternTransform="scale(1)">
+              <image href="" width="140" height="140"/>
+            </pattern>
+            <filter id="rough-bird" x="-12%" y="-12%" width="124%" height="124%">
+              <feTurbulence type="fractalNoise" baseFrequency="0.05 0.10" numOctaves="3" seed="11" result="n"/>
+              <feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/>
+            </filter>
+          </defs>
+          <g filter="url(#rough-bird)">
+            <ellipse id="birdBody" cx="-4" cy="6" rx="24" ry="19"/>
+            <path id="birdTail" d="M-22,0 L-48,-12 L-34,18 Z"/>
+            <path id="birdBeak" d="M16,-10 L32,-4 L16,2 Z"/>
+            <ellipse id="birdWing" cx="-8" cy="9" rx="12" ry="8" transform="rotate(-24 -8 9)"/>
+            <use href="#birdBody" fill="#F0C75E"/>
+            <use href="#birdTail" fill="#F0C75E"/>
+            <use href="#birdBeak" fill="#F0C75E"/>
+            <use href="#birdWing" fill="#F0C75E"/>
+            <use href="#birdBody" fill="url(#tex-bird)" opacity="0.32"/>
+            <use href="#birdTail" fill="url(#tex-bird)" opacity="0.32"/>
+            <use href="#birdBeak" fill="url(#tex-bird)" opacity="0.32"/>
+            <use href="#birdWing" fill="url(#tex-bird)" opacity="0.32"/>
+            <circle cx="10" cy="-8" r="2.2" fill="#5A4634" opacity="0.75"/>
+          </g>
+        </svg>
+        <span class="piece-tag">小鸟</span>
+      </div>
+
+      <div class="piece" id="piece-moon" data-piece="moon" role="button" tabindex="0" aria-label="纸片 月亮，可拖动">
+        <svg viewBox="-48 -48 96 96" width="132" height="132" aria-hidden="true">
+          <defs>
+            <pattern id="tex-moon" patternUnits="userSpaceOnUse" width="140" height="140" patternTransform="scale(1)">
+              <image href="" width="140" height="140"/>
+            </pattern>
+            <filter id="rough-moon" x="-12%" y="-12%" width="124%" height="124%">
+              <feTurbulence type="fractalNoise" baseFrequency="0.05 0.10" numOctaves="3" seed="23" result="n"/>
+              <feDisplacementMap in="SourceGraphic" in2="n" scale="2.2" xChannelSelector="R" yChannelSelector="G"/>
+            </filter>
+          </defs>
+          <g filter="url(#rough-moon)">
+            <path id="moonShape" d="M-9,-42 A27,27 0 1,0 -9,42 A20,20 0 1,1 -9,-42 Z"/>
+            <use href="#moonShape" fill="#B9A4C6"/>
+            <use href="#moonShape" fill="url(#tex-moon)" opacity="0.32"/>
+            <path d="M8,-6 A16,16 0 0 0 6,18" stroke="#8C6A92" stroke-width="2" fill="none" opacity="0.5" stroke-linecap="round"/>
+          </g>
+        </svg>
+        <span class="piece-tag">月亮</span>
+      </div>
+
+      <canvas id="scrapCanvas" aria-hidden="true"></canvas>
+
+      <div class="hint-chip" id="hintChip">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 19V5m0 0-5 5m5-5 5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>拖起纸片 —— 它会碎成纸屑再拼回</span>
+      </div>
+
+      <div class="stage-footer">
+        <span class="stage-info" id="stageInfo">画布 900 × 780 · 3 张纸片 · 底图已锁定</span>
+        <div class="zoom-ctl" role="group" aria-label="缩放控制">
+          <button class="zoom-btn" id="zoomOut" aria-label="缩小">−</button>
+          <button class="zoom-val" id="zoomVal" aria-label="当前缩放 100%">100%</button>
+          <button class="zoom-btn" id="zoomIn" aria-label="放大">+</button>
+          <button class="zoom-btn" id="zoomFit" aria-label="适应画布">⤢</button>
+        </div>
+      </div>
+    </main>
+
+    <!-- ─────────── 右栏 280px ─────────── -->
+    <aside class="panel panel-right" aria-label="色板、纹理与属性">
+      <section class="panel-sec" aria-labelledby="swatchTitle">
+        <h2 class="sec-title" id="swatchTitle">色板 <span class="sec-note">着色</span></h2>
+        <div class="swatch-grid" role="group" aria-label="纸片配色">
+          <button class="swatch is-on" data-color="#D68A55" aria-pressed="true" style="--c:#D68A55" aria-label="陶土色">
+            <span class="swatch-dot"></span><span class="swatch-name">陶土</span>
+          </button>
+          <button class="swatch" data-color="#7A8B5C" aria-pressed="false" style="--c:#7A8B5C" aria-label="苔绿色">
+            <span class="swatch-dot"></span><span class="swatch-name">苔绿</span>
+          </button>
+          <button class="swatch" data-color="#B9A4C6" aria-pressed="false" style="--c:#B9A4C6" aria-label="淡紫色">
+            <span class="swatch-dot"></span><span class="swatch-name">淡紫</span>
+          </button>
+          <button class="swatch" data-color="#F0C75E" aria-pressed="false" style="--c:#F0C75E" aria-label="金色">
+            <span class="swatch-dot"></span><span class="swatch-name">金</span>
+          </button>
+          <button class="swatch" data-color="#5A4634" aria-pressed="false" style="--c:#5A4634" aria-label="墨褐色">
+            <span class="swatch-dot"></span><span class="swatch-name">墨褐</span>
+          </button>
+          <button class="swatch" data-color="#EDE4D0" aria-pressed="false" style="--c:#EDE4D0" aria-label="奶油色">
+            <span class="swatch-dot"></span><span class="swatch-name">奶油</span>
+          </button>
+        </div>
+      </section>
+
+      <section class="panel-sec" aria-labelledby="texTitle">
+        <h2 class="sec-title" id="texTitle">纹理 <span class="sec-note">纸感</span></h2>
+        <div class="tex-grid" role="group" aria-label="纸片纹理">
+          <button class="tex-card is-on" data-tex="wrinkle" aria-pressed="true" aria-label="皱纹纸纹理">
+            <span class="tex-thumb" data-tex-thumb="wrinkle"></span>
+            <span class="tex-name">皱纹纸</span>
+          </button>
+          <button class="tex-card" data-tex="watercolor" aria-pressed="false" aria-label="水彩纸纹理">
+            <span class="tex-thumb" data-tex-thumb="watercolor"></span>
+            <span class="tex-name">水彩纸</span>
+          </button>
+          <button class="tex-card" data-tex="corrugate" aria-pressed="false" aria-label="瓦楞纸纹理">
+            <span class="tex-thumb" data-tex-thumb="corrugate"></span>
+            <span class="tex-name">瓦楞纸</span>
+          </button>
+          <button class="tex-card" data-tex="glitter" aria-pressed="false" aria-label="金葱纸纹理">
+            <span class="tex-thumb" data-tex-thumb="glitter"></span>
+            <span class="tex-name">金葱纸</span>
+          </button>
+        </div>
+      </section>
+
+      <section class="panel-sec" aria-labelledby="propTitle">
+        <div class="sec-row">
+          <h2 class="sec-title" id="propTitle">属性 <span class="sec-note" id="propPieceName">枫叶</span></h2>
+        </div>
+        <div class="prop-list">
+          <div class="prop-row">
+            <label class="prop-label" for="propSize">尺寸</label>
+            <input class="prop-range" id="propSize" type="range" min="40" max="140" value="100" aria-valuetext="100%"/>
+            <span class="prop-val" id="propSizeVal">100%</span>
+          </div>
+          <div class="prop-row">
+            <label class="prop-label" for="propRot">旋转</label>
+            <input class="prop-range" id="propRot" type="range" min="-45" max="45" value="-8" aria-valuetext="-8°"/>
+            <span class="prop-val" id="propRotVal">−8°</span>
+          </div>
+          <div class="prop-row">
+            <label class="prop-label" for="propOp">不透明</label>
+            <input class="prop-range" id="propOp" type="range" min="20" max="100" value="100" aria-valuetext="100%"/>
+            <span class="prop-val" id="propOpVal">100%</span>
+          </div>
+          <div class="prop-row">
+            <label class="prop-label" for="propTex">纹理比</label>
+            <input class="prop-range" id="propTex" type="range" min="25" max="150" value="100" aria-valuetext="100%"/>
+            <span class="prop-val" id="propTexVal">100%</span>
+          </div>
+          <label class="prop-toggle">
+            <input type="checkbox" id="propStroke" aria-label="显示描边"/>
+            <span class="toggle-track" aria-hidden="true"><span class="toggle-thumb"></span></span>
+            <span class="toggle-label">纸边描线</span>
+          </label>
+          <button class="btn btn-danger" id="btnDelete">
+            <svg viewBox="0 0 20 20" width="15" height="15"><path d="M5 6h10M8 6V4h4v2M6 6l1 10h6l1-10M8.5 9v4M11.5 9v4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span>撕掉这张纸片</span>
+          </button>
+        </div>
+      </section>
+
+      <div class="feel-note" aria-hidden="true">
+        <span class="feel-quote">把纸片拖起来，它会碎成纸屑，再拼回原位</span>
+        <span class="feel-stamp">手感 · 暖</span>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>pasteup · 摊开的手帐本</title>
+<meta name="description" content="pasteup 手帐剪纸拼贴桌面 app 视觉原型 03：摊开的手帐本。一个工具界面，不用 UI 卡片，用胶带、便利贴、手写与圈注承载全部信息架构。" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Cpath d='M13 3 l3.2 6.6 7.3 1 -5.3 5.1 1.3 7.2 -6.5-3.4 -6.5 3.4 1.3-7.2 L2.5 10.6 l7.3-1 Z' fill='%23C0392B' stroke='%235A4634' stroke-width='1'/%3E%3C/svg%3E" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Liu+Jian+Mao+Cao&family=Ma+Shan+Zheng&family=Nunito:wght@400;600;700;800&family=ZCOOL+KuaiLe&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- SVG 滤镜与图章：供纸边位移、按压图章与纹理复用 -->
+  <svg width="0" height="0" class="svg-defs" aria-hidden="true" focusable="false">
+    <defs>
+      <filter id="paperEdge" x="-10%" y="-10%" width="130%" height="130%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.045" numOctaves="3" seed="11" result="noise" />
+        <feDisplacementMap in="SourceGraphic" in2="noise" scale="4.5" />
+        <feDropShadow dx="2" dy="3.5" stdDeviation="2.4" flood-color="#5A4634" flood-opacity="0.3" />
+      </filter>
+      <filter id="roughOnly" x="-6%" y="-6%" width="112%" height="112%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="2" seed="23" result="noise" />
+        <feDisplacementMap in="SourceGraphic" in2="noise" scale="3" />
+      </filter>
+    </defs>
+  </svg>
+
+  <div class="desk">
+    <div class="journal" role="application" aria-label="pasteup 摊开的手帐本">
+
+      <!-- ══════════ 顶栏：一条裁纸 + 胶带固定 ══════════ -->
+      <header class="topbar">
+        <span class="tape tape--topbar" aria-hidden="true"></span>
+
+        <div class="brand">
+          <svg class="brand-mark" viewBox="0 0 26 26" aria-hidden="true">
+            <path d="M13 3 l3.2 6.6 7.3 1 -5.3 5.1 1.3 7.2 -6.5-3.4 -6.5 3.4 1.3-7.2 L2.5 10.6 l7.3-1 Z" fill="none" stroke="#5A4634" stroke-width="1.6" stroke-linejoin="round" transform="rotate(-6 13 13)" />
+          </svg>
+          <h1 class="reveal brand-name">pasteup · 摊开的手帐本</h1>
+        </div>
+
+        <nav class="crumb" aria-label="当前位置">
+          <span>手帐本</span><i class="crumb-arrow" aria-hidden="true">›</i><span class="crumb-cur">秋日拼贴</span>
+        </nav>
+
+        <div class="top-actions">
+          <div class="top-date" aria-label="今天是 2026年8月7日 立秋">
+            <span class="date-num">8.7</span>
+            <span class="date-tag">立秋</span>
+          </div>
+          <span class="saved-hint" id="saved-hint">已自动保存 ✓</span>
+          <button class="export-btn" id="export-btn" type="button">
+            <svg viewBox="0 0 18 18" aria-hidden="true"><path d="M4 2 h10 v7 c0 3 -2.5 5 -5 5 c-2.5 0 -5 -2 -5 -5 Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M3 15 h12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+            导出成品
+          </button>
+        </div>
+      </header>
+
+      <!-- ══════════ 摊开的两页 ══════════ -->
+      <div class="spread">
+
+        <!-- ── 左页：手绘目录 / 工具 / 图层 ── -->
+        <aside class="page page-left" aria-label="左页：目录、工具与图层">
+          <h2 class="sec-head reveal">目录</h2>
+          <ol class="toc">
+            <li><span>① 工具</span><i class="leaders" aria-hidden="true"></i><b>2</b></li>
+            <li><span>② 图层</span><i class="leaders" aria-hidden="true"></i><b>3</b></li>
+            <li><span>③ 装订成册</span><i class="leaders" aria-hidden="true"></i><b>4</b></li>
+          </ol>
+
+          <div class="cutline" aria-hidden="true"><span class="scissor">✂</span><span class="cutline-text">从这里裁开</span></div>
+
+          <section class="toolbox" aria-labelledby="tools-head">
+            <h3 class="sec-head" id="tools-head">工具</h3>
+            <ul class="tool-list">
+              <li><button class="tool-btn" type="button" data-tool="select" aria-pressed="false">
+                <svg viewBox="0 0 18 18" aria-hidden="true"><path d="M4 2 L14 14 L9.6 12.2 L6.6 17 L4.4 15.2 L7.4 10.6 Z" fill="#5A4634" transform="rotate(-8 9 9)"/></svg>
+                <span>选择</span></button></li>
+              <li><button class="tool-btn is-active" type="button" data-tool="trace" aria-pressed="true">
+                <svg viewBox="0 0 18 18" aria-hidden="true"><path d="M13.5 2.5 L15.5 4.5 L7 14 L3 15 L4.6 11 Z" fill="none" stroke="#5A4634" stroke-width="1.5" stroke-linejoin="round"/><path d="M11.5 4.5 l3 3" stroke="#5A4634" stroke-width="1.5" stroke-linecap="round"/></svg>
+                <span>描摹</span></button></li>
+              <li><button class="tool-btn" type="button" data-tool="paper" aria-pressed="false">
+                <svg viewBox="0 0 18 18" aria-hidden="true"><path d="M3 6 l2 -2 1 1.4 2 -1.8 1.5 1.2 2 -1 1 1.8 2.5 -1 L15 9 l-1.5 1.5 .6 2 -2 1.6 -1.2 -1.2 -2 1 -1.6 -1.4 -1.7 1.2 -1.3 -1.8 L4 10 3.4 8.4 Z" fill="none" stroke="#5A4634" stroke-width="1.4" stroke-linejoin="round"/></svg>
+                <span>纸片</span></button></li>
+              <li><button class="tool-btn" type="button" data-tool="texture" aria-pressed="false">
+                <svg viewBox="0 0 18 18" aria-hidden="true"><path d="M2.5 6 q2 -2.5 4 0 t4 0 t4 0 M2.5 12 q2 -2.5 4 0 t4 0 t4 0" fill="none" stroke="#5A4634" stroke-width="1.5" stroke-linecap="round"/></svg>
+                <span>纹理</span></button></li>
+              <li><button class="tool-btn" type="button" data-tool="color" aria-pressed="false">
+                <svg viewBox="0 0 18 18" aria-hidden="true"><path d="M9 2.2 C9 2.2 14.5 7.6 14.5 12 A5.5 5.5 0 1 1 3.5 12 C3.5 7.6 9 2.2 9 2.2 Z" fill="none" stroke="#5A4634" stroke-width="1.5" stroke-linejoin="round"/><path d="M6.8 12 a1 1 0 1 0 2 0 a1 1 0 0 0 -2 0" fill="#5A4634"/></svg>
+                <span>着色</span></button></li>
+              <li><button class="tool-btn" type="button" data-tool="collage" aria-pressed="false">
+                <svg viewBox="0 0 18 18" aria-hidden="true"><rect x="2.5" y="4.5" width="8" height="8" fill="none" stroke="#5A4634" stroke-width="1.5" transform="rotate(-5 6.5 8.5)"/><rect x="8" y="6.5" width="8" height="8" fill="none" stroke="#5A4634" stroke-width="1.5" transform="rotate(6 12 10.5)"/></svg>
+                <span>拼贴</span></button></li>
+            </ul>
+          </section>
+
+          <section class="layers" aria-labelledby="layers-head">
+            <h3 class="sec-head" id="layers-head">图层
+              <svg class="paperclip" viewBox="0 0 22 34" aria-hidden="true"><path d="M14 4 C17 4 19 6 19 9 L19 24 C19 28 16 30 13 30 C10 30 8 28 8 25 L8 10 C8 8 9 7 11 7 C13 7 14 8 14 10 L14 24" fill="none" stroke="#8C6A92" stroke-width="2.2" stroke-linecap="round"/></svg>
+            </h3>
+            <ul class="layer-list">
+              <li><button class="layer-row" type="button" data-layer="base">
+                <span class="layer-dot" style="--dot:#C9BFA6"></span><span class="layer-name">照片底图</span><i class="layer-eye" aria-hidden="true">◉</i></button></li>
+              <li><button class="layer-row is-active" type="button" data-layer="leaf">
+                <span class="layer-dot" style="--dot:#C0392B"></span><span class="layer-name">枫叶 · 描摹</span><i class="layer-eye" aria-hidden="true">◉</i></button></li>
+              <li><button class="layer-row" type="button" data-layer="moss">
+                <span class="layer-dot" style="--dot:#7A8B5C"></span><span class="layer-name">苔绿纸片</span><i class="layer-eye" aria-hidden="true">◉</i></button></li>
+              <li><button class="layer-row" type="button" data-layer="tag">
+                <span class="layer-dot" style="--dot:#8C6A92"></span><span class="layer-name">淡紫贴纸</span><i class="layer-eye" aria-hidden="true">◉</i></button></li>
+            </ul>
+            <p class="layer-hint">⇅ 拖动排序 · 点眼睛藏起来</p>
+          </section>
+
+          <div class="sticky-note note-left" aria-label="便签：今天的拼贴步骤">
+            <p>今天的目标</p>
+            <ol class="note-list">
+              <li>描好这片枫叶</li>
+              <li>给苔绿纸片上纹理</li>
+              <li>导出装订成册 ✿</li>
+            </ol>
+          </div>
+          <p class="left-corner-note">立秋已过 · 昼短夜长，适合留一盏灯拼贴</p>
+        </aside>
+
+        <!-- 中缝：装订线 -->
+        <div class="spine" aria-hidden="true"></div>
+
+        <!-- ── 右页：画布 + 贴纸/色卡边栏 ── -->
+        <main class="canvas" role="group" aria-label="画布：留白拼贴页">
+          <span class="dogear" aria-hidden="true"></span>
+
+          <!-- 逐字浮现的主批注 -->
+          <p class="annotation reveal" id="annotation">今天描了这片枫叶</p>
+          <p class="annotation-sub">留出空白，秋天会自己填满。</p>
+          <svg class="underline-svg" viewBox="0 0 300 12" aria-hidden="true">
+            <path class="underline-path" d="M6 8 C 60 3, 130 11, 294 6" fill="none" stroke="#C0392B" stroke-width="2.6" stroke-linecap="round"/>
+          </svg>
+
+          <!-- 照片底图：拍立得 -->
+          <button class="piece piece-photo" type="button" data-name="照片底图" data-pos="x 84 · y 320" data-rot="4°" data-scale="1.0×" data-op="70%" aria-label="选择照片底图层">
+            <span class="photo-frame">
+              <svg class="photo-svg" viewBox="0 0 160 130" aria-hidden="true">
+                <rect width="160" height="130" fill="#EFE7D2"/>
+                <circle cx="124" cy="32" r="15" fill="#E3CB98"/>
+                <path d="M0 92 Q 42 60 72 80 Q 104 96 160 74 L160 130 L0 130 Z" fill="#ADAE8B"/>
+                <path d="M0 108 Q 58 84 104 96 Q 132 102 160 96 L160 130 L0 130 Z" fill="#98A57D"/>
+                <path d="M112 130 L116 104 Q 120 92 128 92 L132 130 Z" fill="#9A7E68"/>
+                <circle cx="128" cy="86" r="14" fill="#84966C"/>
+                <path d="M16 96 Q 40 74 64 88" fill="none" stroke="#5A4634" stroke-width="1.6" stroke-dasharray="4 4" stroke-linecap="round"/>
+              </svg>
+              <span class="photo-caption">照片底图 · 秋日山野</span>
+            </span>
+          </button>
+
+          <!-- 枫叶纸片（描摹产物） -->
+          <button class="piece piece-leaf is-active" type="button" data-name="枫叶 · 描摹" data-pos="x 214 · y 96" data-rot="-8°" data-scale="1.4×" data-op="96%" aria-label="选择枫叶纸片">
+            <svg class="leaf-svg" viewBox="0 0 100 120" aria-hidden="true">
+              <path class="leaf-shape" d="M50 112 C48 106 48 100 49 94 C42 96 32 92 24 84 C18 88 11 87 7 82 C13 76 21 74 25 71 C17 66 9 60 7 52 C16 53 25 53 31 50 C24 43 16 35 12 27 C22 30 31 31 37 28 C35 17 41 9 50 7 C59 9 65 17 63 28 C69 31 78 30 88 27 C84 35 76 43 69 50 C75 53 84 53 93 52 C91 60 83 66 75 71 C79 74 87 76 93 82 C89 87 82 88 76 84 C68 92 58 96 51 94 C52 100 52 106 50 112 Z" fill="#C0392B"/>
+              <g class="leaf-veins" fill="none" stroke="#8E2B20" stroke-width="1.5" stroke-linecap="round">
+                <path d="M50 92 Q47.5 55 50 20"/>
+                <path d="M50 76 Q 34 60 16 44"/>
+                <path d="M50 76 Q 66 60 84 44"/>
+                <path d="M42 50 Q 30 40 20 30"/>
+                <path d="M58 50 Q 70 40 80 30"/>
+                <path d="M46 84 Q 32 78 20 78"/>
+                <path d="M54 84 Q 68 78 80 78"/>
+              </g>
+            </svg>
+            <svg class="sel-ring sel-ring--leaf" viewBox="0 0 300 300" aria-hidden="true">
+              <ellipse cx="150" cy="152" rx="126" ry="136" fill="none" stroke="#7A8B5C" stroke-width="2.4" stroke-dasharray="6 7" transform="rotate(7 150 152)"/>
+              <path d="M268 30 L284 40 L268 52 M284 40 L296 36" fill="none" stroke="#7A8B5C" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </button>
+
+          <!-- 苔绿纸片：撕边票根 -->
+          <button class="piece piece-moss" type="button" data-name="苔绿纸片" data-pos="x 486 · y 252" data-rot="4°" data-scale="0.9×" data-op="92%" aria-label="选择苔绿纸片">
+            <span class="tape tape--moss" aria-hidden="true"></span>
+            <span class="moss-inner">
+              <b class="moss-title">今日天气 · 晴</b>
+              <span class="moss-dots" aria-hidden="true">◌ ◌ ◌</span>
+            </span>
+          </button>
+
+          <!-- 淡紫贴纸 -->
+          <button class="piece piece-tag" type="button" data-name="淡紫贴纸" data-pos="x 618 · y 508" data-rot="-12°" data-scale="1.0×" data-op="100%" aria-label="选择淡紫贴纸">
+            <svg viewBox="0 0 110 110" aria-hidden="true">
+              <circle cx="55" cy="55" r="50" fill="#8C6A92"/>
+              <circle cx="55" cy="55" r="41" fill="none" stroke="#F7F0E0" stroke-width="1.6" stroke-dasharray="3 5" opacity="0.75"/>
+              <path d="M55 32 l5.2 10.6 11.6 1.7 -8.4 8.2 2 11.6 -10.4-5.5 -10.4 5.5 2-11.6 -8.4-8.2 11.6-1.7 Z" fill="#F7F0E0" opacity="0.9"/>
+              <text x="55" y="98" text-anchor="middle" fill="#F7F0E0" font-size="9" opacity="0.9" font-family="'Liu Jian Mao Cao',cursive">收藏</text>
+            </svg>
+          </button>
+
+          <!-- 手绘箭头：批注 → 枫叶 -->
+          <svg class="doodle-arrow" viewBox="0 0 140 90" aria-hidden="true">
+            <path d="M8 10 C 36 34, 60 46, 100 60" fill="none" stroke="#5A4634" stroke-width="2.2" stroke-linecap="round"/>
+            <path d="M92 51 L102 62 L91 68" fill="none" stroke="#5A4634" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="8" cy="10" r="3.4" fill="none" stroke="#5A4634" stroke-width="1.8"/>
+          </svg>
+
+          <!-- 边注 -->
+          <p class="marginalia note-tape">小心，胶带还没干透</p>
+
+          <!-- 装饰涂鸦：压花 / 螺旋 / 小星星 -->
+          <svg class="doodle flower" viewBox="0 0 60 80" aria-hidden="true">
+            <path d="M30 74 C30 60 30 46 30 28" fill="none" stroke="#64734A" stroke-width="1.6" stroke-linecap="round"/>
+            <path d="M30 58 C22 52 17 54 13 58 C20 62 26 62 30 60 M30 46 C38 42 43 44 47 48 C40 52 34 52 30 49" fill="none" stroke="#64734A" stroke-width="1.3" stroke-linecap="round"/>
+            <g stroke="#C0392B" stroke-width="1.2" stroke-linejoin="round">
+              <ellipse cx="30" cy="16" rx="4.6" ry="8" fill="#D9B6C2" transform="rotate(0 30 16)"/>
+              <ellipse cx="30" cy="16" rx="4.6" ry="8" fill="#D9B6C2" transform="rotate(60 30 16)"/>
+              <ellipse cx="30" cy="16" rx="4.6" ry="8" fill="#D9B6C2" transform="rotate(120 30 16)"/>
+              <ellipse cx="30" cy="16" rx="4.6" ry="8" fill="#D9B6C2" transform="rotate(180 30 16)"/>
+              <ellipse cx="30" cy="16" rx="4.6" ry="8" fill="#D9B6C2" transform="rotate(240 30 16)"/>
+              <ellipse cx="30" cy="16" rx="4.6" ry="8" fill="#D9B6C2" transform="rotate(300 30 16)"/>
+            </g>
+            <circle cx="30" cy="16" r="2.6" fill="#E8C88A"/>
+          </svg>
+
+          <svg class="doodle spiral" viewBox="0 0 48 48" aria-hidden="true">
+            <path d="M24 24 m0 0 c 3-5 12-4 14 2 c 2 6 -5 11 -12 10 c -7-1 -11-9 -8.5-16 c 2.5-7 12-9 18.5-5 c 6 3.5 7.5 13.5 3 20 c -4 6 -14 7 -19.5 2" fill="none" stroke="#7A8B5C" stroke-width="1.7" stroke-linecap="round"/>
+          </svg>
+
+          <svg class="doodle star" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 2 L14.9 8.6 L22 9.3 L16.7 14 L18.2 21 L12 17.3 L5.8 21 L7.3 14 L2 9.3 L9.1 8.6 Z" fill="#E8C88A" stroke="#5A4634" stroke-width="1" stroke-linejoin="round" transform="rotate(-14 12 12)"/>
+          </svg>
+
+          <!-- 导出图章 -->
+          <div class="stamp" id="stamp" role="status" aria-live="polite">已装订 ✓<i>8.7 立秋</i></div>
+
+          <p class="canvas-footnote">第 3 页 · 留白页</p>
+        </main>
+
+        <!-- ── 右页边栏：色板 / 纹理 / 属性 ── -->
+        <aside class="page page-right" aria-label="右页边栏：色板、纹理与属性">
+          <section class="palette" aria-labelledby="palette-head">
+            <h3 class="sec-head" id="palette-head">色板
+              <span class="tape tape--mini" aria-hidden="true"></span>
+            </h3>
+            <ul class="swatches">
+              <li><button class="swatch is-active" type="button" style="--sw:#C0392B" data-name="朱红" aria-pressed="true" aria-label="色板：朱红"><span class="sw-paper"></span><em>朱红</em></button></li>
+              <li><button class="swatch" type="button" style="--sw:#7A8B5C" data-name="苔绿" aria-pressed="false" aria-label="色板：苔绿"><span class="sw-paper"></span><em>苔绿</em></button></li>
+              <li><button class="swatch" type="button" style="--sw:#8C6A92" data-name="淡紫" aria-pressed="false" aria-label="色板：淡紫"><span class="sw-paper"></span><em>淡紫</em></button></li>
+              <li><button class="swatch" type="button" style="--sw:#5A4634" data-name="墨褐" aria-pressed="false" aria-label="色板：墨褐"><span class="sw-paper"></span><em>墨褐</em></button></li>
+              <li><button class="swatch" type="button" style="--sw:#E8C88A" data-name="暖黄" aria-pressed="false" aria-label="色板：暖黄"><span class="sw-paper"></span><em>暖黄</em></button></li>
+              <li><button class="swatch" type="button" style="--sw:#F3EBD7" data-name="米白" aria-pressed="false" aria-label="色板：米白"><span class="sw-paper"></span><em>米白</em></button></li>
+            </ul>
+            <p class="pick-note" id="pick-note">你选了「朱红」</p>
+          </section>
+
+          <div class="cutline cutline--right" aria-hidden="true"><span class="scissor">✂</span><span class="cutline-text">纹理样纸</span></div>
+
+          <section class="textures" aria-labelledby="tex-head">
+            <h3 class="sec-head" id="tex-head">纹理</h3>
+            <ul class="tex-grid">
+              <li><button class="tex" type="button" data-tex="水彩" aria-pressed="false"><span class="tex-paper tex--wc"></span><em>水彩</em></button></li>
+              <li><button class="tex is-active" type="button" data-tex="颗粒" aria-pressed="true"><span class="tex-paper tex--grain"></span><em>颗粒</em></button></li>
+              <li><button class="tex" type="button" data-tex="纤维" aria-pressed="false"><span class="tex-paper tex--fiber"></span><em>纤维</em></button></li>
+              <li><button class="tex" type="button" data-tex="折痕" aria-pressed="false"><span class="tex-paper tex--fold"></span><em>折痕</em></button></li>
+            </ul>
+          </section>
+
+          <div class="cutline cutline--right" aria-hidden="true"><span class="scissor">✂</span><span class="cutline-text">这页的属性</span></div>
+
+          <section class="props" aria-labelledby="props-head">
+            <h3 class="sec-head" id="props-head">属性</h3>
+            <dl class="prop-list">
+              <div class="prop-row"><dt>纸片</dt><dd class="prop-name" id="prop-name">枫叶 · 描摹</dd></div>
+              <div class="prop-row"><dt>位置</dt><dd><b class="num" id="prop-pos">x 214 · y 96</b></dd></div>
+              <div class="prop-row"><dt>旋转</dt><dd><b class="num" id="prop-rot">-8°</b></dd></div>
+              <div class="prop-row"><dt>缩放</dt><dd><b class="num" id="prop-scale">1.4×</b></dd></div>
+              <div class="prop-row"><dt>不透明</dt><dd><b class="num" id="prop-op">96%</b></dd></div>
+            </dl>
+            <p class="prop-note">数值都记在这本册子里了 ⇣</p>
+          </section>
+
+          <div class="washi-block">
+            <svg class="washi-roll" viewBox="0 0 96 60" aria-hidden="true">
+              <path d="M13 14 L13 48 A34 10 0 0 0 81 48 L81 14 A34 10 0 0 1 13 14 Z" fill="#C0392B"/>
+              <ellipse cx="47" cy="48" rx="34" ry="10" fill="#8E2B20"/>
+              <ellipse cx="47" cy="14" rx="34" ry="10" fill="#E05A45"/>
+              <ellipse cx="47" cy="14" rx="13" ry="4.5" fill="#7A2418"/>
+              <path d="M81 26 Q 97 25 101 18 L 104 26 Q 93 33 81 33 Z" fill="rgba(192,57,43,0.55)"/>
+              <path d="M13 14 C 20 18 27 12 34 16 C 41 20 48 14 55 17 C 62 20 69 14 75 16" fill="none" stroke="rgba(255,255,255,0.28)" stroke-width="1.4" stroke-linecap="round"/>
+            </svg>
+            <p class="washi-caption">备用胶带<br/>撕开即用</p>
+          </div>
+
+          <div class="tape tape--corner" aria-hidden="true"></div>
+        </aside>
+
+      </div>
+    </div>
+
+    <!-- 纸张纤维颗粒 -->
+    <div class="grain" aria-hidden="true"></div>
+    <div class="fiber" aria-hidden="true"></div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

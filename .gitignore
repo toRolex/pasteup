@@ -16,3 +16,6 @@ prototypes/**/shots/
 
 # 抓取产物（firecrawl）
 .firecrawl/
+
+# playwright-cli 运行时会话产物
+.playwright-cli/

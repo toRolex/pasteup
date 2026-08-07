@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="icon" href="data:," />
+<title>guide · 04 碎纸拼贴 SCRAP MOTION</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Nunito:wght@400;600;700;800&family=ZCOOL+KuaiLe&display=swap" rel="stylesheet" />
+<style>
+  :root { --cream:#EDE4D0; --terra:#D68A55; --moss:#7A8B5C; --lilac:#B9A4C6; --gold:#F0C75E; --ink:#5A4634; --paper:#F2EAD9; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:'Nunito','PingFang SC',sans-serif; font-size:14px; line-height:1.75; color:var(--ink);
+    background:linear-gradient(180deg,#F2EAD9 0%,#E8DCC4 100%); min-height:100vh; }
+  .wrap { max-width:760px; margin:0 auto; padding:48px 28px 80px; }
+  .brand { font-family:'Caveat',cursive; font-size:24px; font-weight:700; color:var(--terra); margin-bottom:36px; }
+  .brand a { color:var(--terra); text-decoration:none; }
+  h1 { font-family:'Caveat','ZCOOL KuaiLe',cursive; font-size:clamp(34px,5vw,48px); font-weight:700; color:var(--terra); margin-bottom:6px; letter-spacing:.01em; }
+  .sub { font-family:'Caveat',cursive; font-size:20px; color:var(--moss); margin-bottom:30px; }
+  .block { background:rgba(242,234,217,.9); border:1px solid rgba(90,70,52,.14); border-radius:12px; padding:22px 24px; margin-bottom:22px;
+    box-shadow:0 6px 18px rgba(90,70,52,.10); }
+  .block h2 { font-family:'Caveat',cursive; font-size:24px; font-weight:700; color:var(--moss); margin-bottom:12px; }
+  .block p { margin-bottom:10px; }
+  .block ul { padding-left:20px; }
+  .block li { margin-bottom:8px; }
+  code { font-family:'Nunito',monospace; font-size:12.5px; background:rgba(214,138,85,.14); padding:1px 6px; border-radius:5px; color:#A55627; }
+  pre { background:#3A2F22; color:#F2EAD9; border-radius:10px; padding:16px 18px; font-size:12.5px; line-height:1.6; overflow-x:auto; margin:10px 0; }
+  pre code { background:none; color:inherit; padding:0; }
+  .tag { display:inline-block; font-size:11px; font-weight:700; color:#F2EAD9; background:var(--lilac); border-radius:999px; padding:3px 10px; margin-right:6px; margin-bottom:6px; }
+  .back { display:inline-block; margin-top:8px; font-weight:700; color:var(--terra); text-decoration:none; }
+  .back:hover { text-decoration:underline; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand"><a href="../">← 碎纸拼贴</a></div>
+  <h1>碎纸拼贴 · SCRAP MOTION</h1>
+  <div class="sub">how it was built — 纸屑的运动记录</div>
+
+  <div class="block">
+    <h2>收到的 brief</h2>
+    <p>纸片的生命由碎纸粒子构成：选中、拖动、删除纸片时它解构成碎纸屑再重组，图层重排时纸片像被风掀起翻面，界面充满纸张的物理运动。<span class="tag">粒子物理</span><span class="tag">能力轴：粒子物理</span></p>
+    <p><b>要 prove 的一件事</b>：拼贴过程本身的「运动美感」——纸片不是静态粘贴，而是有拆解、飘动、重组的过程，让用户感觉到纸张的物理存在。</p>
+  </div>
+
+  <div class="block">
+    <h2>签名技法</h2>
+    <ul>
+      <li><b>手写 canvas 粒子系统</b>（requestAnimationFrame，无粒子库）：解构时按颜色组散成 30 枚不规则碎纸屑（四边抖动形状、自旋、重力、地面/墙面弹性回弹），重组时 spring 收敛。</li>
+      <li><b>物理弹跳 / 重力</b>：free 粒子带 gravity / restitution / friction，可在地面墙面弹跳。</li>
+      <li><b>拖拽解构 → 跟随 → 重组</b>：拖起纸片 → 纸屑云保留轮廓跟随指针，拖动甩出拖尾，松开飞回拼合。</li>
+      <li><b>纸屑撒落</b>：演示动效 / 导出 / 品牌彩蛋从画布顶撒落彩色纸屑。</li>
+      <li><b>图层风掀翻面</b>：重排时纸片 scaleX 翻折 + 上抬 + 弹性落位 + 溅出碎屑。</li>
+      <li><b>gsap 时间线 + CustomEase</b>：scrapOut / scrapIn / wind / scrapBounce 四套缓动驱动演示。</li>
+      <li><b>程序化纸纹</b>：皱纹/水彩/瓦楞/金葱四种 dataURL，SVG pattern 覆盖纸片。</li>
+    </ul>
+  </div>
+
+  <div class="block">
+    <h2>真实代码摘录</h2>
+    <pre><code>// 解构纸片：按颜色组散成碎纸屑，带重力与回弹
+engine.spawnShreds(paper, () => {
+  engine.particles.push({
+    x, y, vx, vy, rot, vr,
+    color, size, shape,
+    gravity: 0.35, bounce: 0.52,
+    life: rand(44, 92), maxLife: 92
+  });
+});
+// 物理积分：重力 + 回弹
+q.vy += q.gravity * dt;
+q.x += q.vx * dt; q.y += q.vy * dt;
+if (q.y &gt; floorY &amp;&amp; q.vy &gt; 0) { q.y = floorY; q.vy *= -q.bounce; }</code></pre>
+  </div>
+
+  <div class="block">
+    <h2>资产来源</h2>
+    <p>零外部位图。纸屑粒子、纸纹、画布底纹全部 canvas 程序生成；字体走 Google Fonts（Caveat / Nunito / ZCOOL KuaiLe）；gsap 3.12+ 走 CDN。</p>
+  </div>
+
+  <div class="block">
+    <h2>批判循环发现与改动</h2>
+    <ul>
+      <li><b>纸片 = DOM + 粒子 canvas overlay</b>：纸片本体是带 torn-edge SVG filter 的 DOM，粒子层是覆盖画布的 canvas（pointer-events:none）。DOM 交互、SVG 造型、canvas 碎屑。</li>
+      <li><b>重组落点 clamp</b>：根据纸片 offsetWidth/Height 限制落点在画布内，避免演示时纸片被拖出裁切（第 1 轮 QA 发现并修复）。</li>
+      <li><b>图层重排</b>：指针式 live reorder，锁定「底图 · 描摹稿」不可移动，重排后同步 z 序并触发风掀动画。</li>
+      <li><b>对比度</b>：正文 #5A4634 对奶油底 7:1，次级 4.9:1。</li>
+    </ul>
+  </div>
+
+  <div class="block">
+    <h2>验证结果</h2>
+    <p>console errors：<b>0</b>（harness + 交互冒烟多次确认）。prove 断言（真实鼠标拖拽 motion QA）：演示解构时粒子数 221 → 1123 再回落重组；拖拽中途纸片 hidden 变成纸屑云（粒子 702），松开后落点重组可见。</p>
+    <p>截图：<code>shots/desktop-top/mid/bottom.png</code>、<code>shots/mobile-top/bottom.png</code>，另有演示关键帧 <code>frame-settled/cloud/recomposed/sprinkle.png</code>。</p>
+    <a class="back" href="../">回到原型 →</a>
+  </div>
+</div>
+</body>
+</html>
