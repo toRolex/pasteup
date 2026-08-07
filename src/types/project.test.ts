@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   createEmptyProject,
   createPaperElement,
+  createPaperTexture,
   parseProject,
   serializeProject,
   type PaperProject,
@@ -69,7 +70,17 @@ describe('serializeProject / parseProject（seam 3）', () => {
       version: 1,
       canvas: { width: 1200, height: 800 },
       bgPhoto: { dataUrl: 'data:image/png;base64,AAAA', visible: true },
-      textures: [{ id: 'tex-1', dataUrl: 'data:image/png;base64,BBBB' }],
+      textures: [
+        {
+          id: 'tex-1',
+          style: 'fold',
+          seed: 42,
+          color: '#7a8b5c',
+          scale: 1.5,
+          rotate: 90,
+          dataUrl: 'data:image/png;base64,BBBB',
+        },
+      ],
       elements: [
         createPaperElement({
           path: 'M 0 0 L 10 0 L 10 10 Z',
@@ -139,5 +150,70 @@ describe('PaperElement.seed（seam 5：seed 写入纸片数据模型）', () => 
 
     expect(restored.elements[0].seed).toBe(987654321);
     expect(restored).toEqual(project);
+  });
+});
+
+describe('createPaperTexture（seam 7：textures 表承载着色合成结果）', () => {
+  it('产出承载着色合成结果的 texture 记录（style/seed/color/scale/rotate/dataUrl）', () => {
+    const tex = createPaperTexture({
+      style: 'fold',
+      seed: 42,
+      color: '#7a8b5c',
+      scale: 1.5,
+      rotate: 90,
+      dataUrl: 'data:image/png;base64,BBBB',
+    });
+
+    expect(tex).toMatchObject({
+      style: 'fold',
+      seed: 42,
+      color: '#7a8b5c',
+      scale: 1.5,
+      rotate: 90,
+      dataUrl: 'data:image/png;base64,BBBB',
+    });
+    expect(typeof tex.id).toBe('string');
+    expect(tex.id.length).toBeGreaterThan(0);
+  });
+
+  it('scale/rotate 未提供时默认 1 / 0', () => {
+    const tex = createPaperTexture({
+      style: 'grain',
+      seed: 7,
+      color: '#c0392b',
+      dataUrl: 'data:image/png;base64,CCCC',
+    });
+    expect(tex.scale).toBe(1);
+    expect(tex.rotate).toBe(0);
+  });
+});
+
+describe('PaperTexture 往返（seam 7：长 dataURL 无损坏，T12 主 seam 依赖）', () => {
+  it('长 dataURL 在 serialize → parse 往返中逐字符保真', () => {
+    // 模拟 2048² PNG 的较长 base64 dataURL（约 2KB）
+    const longDataUrl = `data:image/png;base64,${'A'.repeat(2000)}`;
+    const project: PaperProject = {
+      version: 1,
+      canvas: { width: 100, height: 100 },
+      bgPhoto: null,
+      textures: [
+        {
+          id: 'tex-long',
+          style: 'watercolor',
+          seed: 123,
+          color: '#ff0000',
+          scale: 2,
+          rotate: 180,
+          dataUrl: longDataUrl,
+        },
+      ],
+      elements: [],
+    };
+
+    const restored = parseProject(serializeProject(project));
+
+    expect(restored).toEqual(project);
+    expect(restored.textures[0].dataUrl).toBe(longDataUrl);
+    expect(restored.textures[0].dataUrl.length).toBe(longDataUrl.length);
   });
 });

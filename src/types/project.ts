@@ -4,6 +4,8 @@
  * 约定：不依赖 fabric `toObject()` 默认行为，序列化走本 schema 显式声明。
  * 字段名是本仓库共享契约（后续 issue 依赖），不要随意改名。
  */
+import type { TextureStyle } from '../texture/generator';
+import type { TextureRotation } from '../texture/shade';
 
 /** 纸片的位姿变换（对应 fabric.Path 的 left/top/angle/scaleX/scaleY）。 */
 export interface ProjectTransform {
@@ -31,10 +33,49 @@ export interface PaperElement {
   transform: ProjectTransform;
 }
 
-/** 纹理资产：全转 dataURL，保证项目 JSON 与导出 SVG 自包含。 */
+/**
+ * 纹理记录（T8）：承载「灰度纹理 → 着色合成 → 纸面 dataURL」的合成结果。
+ * 全转 dataURL 保证项目 JSON 与导出 SVG 自包含（ADR 0001：运行时与导出共用同一数据源）。
+ * 一条记录即一个着色变体（texId:color:scale:rotate 唯一），dataUrl 为已烘焙 scale/rotate 的位图。
+ */
 export interface PaperTexture {
   id: string;
+  /** 灰度源风格（T7 6 风格之一）。 */
+  style: TextureStyle;
+  /** 灰度源 seed（程序化纹理确定性）。 */
+  seed: number;
+  /** 用户色（规范 hex）。 */
+  color: string;
+  /** 纹理缩放（0.5–2）。 */
+  scale: number;
+  /** 纹理旋转（0/90/180/270）。 */
+  rotate: TextureRotation;
+  /** 着色合成结果（已烘焙 scale/rotate）的自包含 dataURL。 */
   dataUrl: string;
+}
+
+/** createPaperTexture 输入；scale/rotate 未提供时默认 1 / 0。 */
+export interface CreatePaperTextureInput {
+  id?: string;
+  style: TextureStyle;
+  seed: number;
+  color: string;
+  scale?: number;
+  rotate?: TextureRotation;
+  dataUrl: string;
+}
+
+/** 创建纹理记录（着色合成变体），未提供的字段取默认值。 */
+export function createPaperTexture(input: CreatePaperTextureInput): PaperTexture {
+  return {
+    id: input.id ?? uid(),
+    style: input.style,
+    seed: input.seed,
+    color: input.color,
+    scale: input.scale ?? 1,
+    rotate: input.rotate ?? 0,
+    dataUrl: input.dataUrl,
+  };
 }
 
 /** 新纸片默认色（T10 属性面板接入色板前写死；取 DESIGN.md 苔绿 moss）。 */

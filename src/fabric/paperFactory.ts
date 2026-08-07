@@ -4,7 +4,7 @@
  * 只做「自定义 schema → fabric 对象」的单向映射；反向（fabric → schema）
  * 由桥接壳在事件回灌时显式读取对象属性完成，不依赖 fabric `toObject()` 默认行为。
  */
-import { Path, Shadow } from 'fabric';
+import { Path, Pattern, Shadow } from 'fabric';
 import type { PaperElement } from '../types/project';
 
 /** 纸片基础层叠投影（对应 DESIGN.md --shadow-lift：柔和、轻微下沉表达层叠浮起）。 */
@@ -65,10 +65,23 @@ function darkenColor(hex: string, factor: number): string {
   return `rgb(${r}, ${g}, ${b})`;
 }
 
-/** 依据纸片 schema 创建带基础样式（层叠投影 + 厚度质感）的 fabric.Path 对象。 */
-export function createFabricPath(element: PaperElement): Path {
+/**
+ * 依据纸片 schema 创建带基础样式（层叠投影 + 厚度质感）的 fabric.Path 对象。
+ * @param element 纸片 schema。
+ * @param textureDataUrl 着色合成后的纹理 dataURL（ADR 0001 预烘焙结果）；传入时用 pattern
+ *   填充（repeat，**不设 patternTransform**），未传保持纯色填充。
+ */
+export function createFabricPath(element: PaperElement, textureDataUrl?: string | null): Path {
   const { path, ...options } = paperToFabricOptions(element);
   const fabricPath = new Path(path, options);
+  if (textureDataUrl) {
+    // ADR 0001 硬性契约：纹理缩放/旋转已在合成时烘焙进位图，pattern 不设 transform，
+    // 运行时与导出共用同一数据源，导出天然正确。
+    fabricPath.fill = new Pattern({
+      source: textureDataUrl as unknown as CanvasImageSource,
+      repeat: 'repeat',
+    });
+  }
   fabricPath.shadow = new Shadow(PAPER_SHADOW);
   fabricPath.stroke = darkenColor(element.color, STROKE_DARKEN_FACTOR);
   fabricPath.strokeWidth = PAPER_STROKE_WIDTH;
