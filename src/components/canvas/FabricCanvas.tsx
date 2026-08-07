@@ -7,9 +7,10 @@
  * - 不依赖 fabric `toObject()` 默认行为，schema 字段显式读写。
  */
 import { useEffect, useRef, type MutableRefObject } from 'react';
-import { Canvas, FabricImage, Path, type TPointerEventInfo } from 'fabric';
+import { Canvas, FabricImage, Path, Point, type TPointerEventInfo } from 'fabric';
 import type { PaperProject } from '../../types/project';
 import { createFabricPath } from '../../fabric/paperFactory';
+import { HIT_TOLERANCE, hitTestElement } from '../../fabric/hitTest';
 import { pointsToOpenPath, tracePointsToPaper } from '../../fabric/traceTool';
 import { getZoom, panBy, resetViewport, zoomBy } from '../../fabric/viewport';
 
@@ -140,6 +141,29 @@ export function FabricCanvas({
     });
     canvasRef.current = canvas;
 
+    // T6 自定义命中：覆写 fabric 私有 _checkTarget（唯一对象命中判定点，被
+    // _searchPossibleTargets 调用）。select 模式按纸片实际轮廓（isPointInPath 纯几何等价）
+    // 命中，替代 fabric 默认 bbox 命中（避免 bbox 内形状外误命中）；不影响 findTarget 的
+    // 活动对象控制柄（缩放/旋转手柄）逻辑。trace 模式 skipTargetFind=true 已短路本覆写。
+    // 注意：这是 fabric 内部私有方法，属桥接壳对画布内部状态的有意接管（与画布分工铁律一致）。
+    type CheckTargetFn = (obj: unknown, pointer: Point) => boolean;
+    const originalCheckTarget = (
+      Canvas.prototype as unknown as { _checkTarget?: CheckTargetFn }
+    )._checkTarget;
+    (canvas as unknown as { _checkTarget: CheckTargetFn })._checkTarget = function (
+      obj: unknown,
+      pointer: Point,
+    ): boolean {
+      const o = obj as { visible?: boolean; evented?: boolean; paperId?: string };
+      if (!o || !o.visible || !o.evented) return false;
+      if (!o.paperId) {
+        return originalCheckTarget ? originalCheckTarget.call(this, obj, pointer) : false;
+      }
+      const element = projectRef.current.elements.find((el) => el.id === o.paperId);
+      if (!element) return false;
+      return hitTestElement(element, { x: pointer.x, y: pointer.y }, HIT_TOLERANCE);
+    };
+
     canvas.on('object:modified', () => {
       const next = readProjectFromCanvas(canvas, projectRef.current);
       onProjectChangeRef.current?.(next);
@@ -233,6 +257,8 @@ export function FabricCanvas({
   }, [activeTool]);
 
   // 单向向下：project 变化时推送 elements 到画布。
+  // renderProject 会 clear 重建对象，导致选中丢失；这里在重建后按 paperId 命令式恢复
+  // activeObject（React→fabric 单向命令式，不引入双向绑定）。bgPhoto 分支只切可见性，不动元素。
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -241,7 +267,17 @@ export function FabricCanvas({
       canvas.requestRenderAll();
       return;
     }
+    const activePaperId = (canvas.getActiveObject() as { paperId?: string } | undefined)?.paperId;
     renderProject(canvas, project);
+    if (activePaperId) {
+      const restored = canvas
+        .getObjects()
+        .find((o) => (o as { paperId?: string }).paperId === activePaperId);
+      if (restored) {
+        canvas.setActiveObject(restored);
+        canvas.requestRenderAll();
+      }
+    }
   }, [project]);
 
   return <div ref={containerElRef} data-testid="fabric-canvas" />;
