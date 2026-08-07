@@ -54,4 +54,17 @@ describe('createFabricPath（seam 5）', () => {
     const path = createFabricPath(el);
     expect((path as unknown as { paperId: string }).paperId).toBe(el.id);
   });
+
+  it('纸片带基础层叠投影（fabric shadow：柔和、offsetY 下沉表达层叠浮起）', () => {
+    const path = createFabricPath(sampleElement());
+    expect(path.shadow).not.toBeNull();
+    expect(path.shadow!.offsetY).toBeGreaterThan(0);
+    expect(path.shadow!.blur).toBeGreaterThan(0);
+  });
+
+  it('纸片带厚度质感（深色描边模拟纸片边缘厚度）', () => {
+    const path = createFabricPath(sampleElement());
+    expect(path.stroke).toBeTruthy();
+    expect(path.strokeWidth).toBeGreaterThan(0);
+  });
 });

@@ -65,4 +65,23 @@ describe('projectStore（seam S2）— 当前项目单一来源', () => {
     useProjectStore.getState().setProject(next);
     expect(useProjectStore.getState().project.canvas).toEqual({ width: 100, height: 200 });
   });
+
+  it('addPaper 追加闭合纸片到 elements 末尾（数组序即 z 序）', () => {
+    useProjectStore.getState().addPaper('M 0 0 L 10 0 L 5 10 Z');
+    useProjectStore.getState().addPaper('M 20 20 L 30 20 L 25 30 Z');
+    const elements = useProjectStore.getState().project.elements;
+    expect(elements).toHaveLength(2);
+    expect(elements[0].path).toBe('M 0 0 L 10 0 L 5 10 Z');
+    expect(elements[0].color).toBe('#7A8B5C');
+    expect(elements[1].path).toBe('M 20 20 L 30 20 L 25 30 Z');
+    expect(elements[1].kind).toBe('paper');
+    // 每片 id 唯一，后画的在数组末尾 = 更高 z 序
+    expect(elements[0].id).not.toBe(elements[1].id);
+  });
+
+  it('addPaper 支持自定义颜色（T10 色板接入前的默认色兜底）', () => {
+    useProjectStore.getState().addPaper('M 0 0 L 1 0 L 0 1 Z', '#c0392b');
+    const el = useProjectStore.getState().project.elements[0];
+    expect(el.color).toBe('#c0392b');
+  });
 });

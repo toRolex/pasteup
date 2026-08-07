@@ -265,6 +265,11 @@
   box-shadow: var(--shadow-hover);
   transform: translateY(-1px);
 }
+.tool-btn--active {
+  outline: 2px solid var(--moss);
+  background: var(--paper-deep);
+  box-shadow: var(--shadow-lift);
+}
 .tool-btn:active {
   transform: translateY(0);
 }
