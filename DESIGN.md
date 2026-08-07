@@ -42,11 +42,13 @@
 | Caption | `Nunito` + 系统 | 400 | 11px | 0.02em |
 | Numeric | `Nunito` | 600 | 13px | 0 |
 
-**Brand font chain** (Google Fonts CDN with local fallback):
+**Brand font chain**（本地打包 + 系统兜底）:
 ```css
---font-display: 'Caveat', 'ZCOOL KuaiLe', 'Hiragino Maru Gothic ProN', cursive, sans-serif;
---font-body: 'Nunito', 'Hiragino Maru Gothic ProN', 'PingFang SC', sans-serif;
+--font-display: 'Caveat', 'ZCOOL KuaiLe', 'Hiragino Maru Gothic ProN', 'Microsoft YaHei', cursive, sans-serif;
+--font-body: 'Nunito', 'Hiragino Maru Gothic ProN', 'PingFang SC', 'Microsoft YaHei', sans-serif;
 ```
+
+**字体资产（本地打包，OFL 1.1）**：`Caveat`(600) / `ZCOOL KuaiLe`(400) / `Nunito`(400/600/700) 以 woff2 子集进 bundle（`src/assets/fonts/`，经 Vite），桌面 App 不运行时走 CDN（离线优先）。标题中文由打包的 ZCOOL KuaiLe 保证双平台一致；中文正文字体不打包——macOS 用系统 `Hiragino Maru Gothic ProN`，Windows 兜底 `Microsoft YaHei`（正文小字号黑体/圆体差异弱，柔和感由标题承载）。本契约是当前 design system 版本，随设计迭代可调整。
 
 Line length cap: 65–75ch for long-form; UI 行高 1.5,标题 1.2.
 

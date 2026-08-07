@@ -36,6 +36,7 @@
 | 状态 | Zustand（管 UI）；Fabric 管画布 |
 | 渲染引擎 | **Fabric.js v7**（调研定稿） |
 | 后端 | Tauri 2.x（Rust），fs 插件做文件读写 |
+| 字体 | Caveat / ZCOOL KuaiLe / Nunito 本地打包（OFL 1.1，woff2 子集，不运行时走 CDN）；中文正文不打包：macOS 系统 Hiragino Maru Gothic ProN，Windows 兜底 Microsoft YaHei |
 | 描摹平滑 | perfect-freehand（辅助库） |
 
 ## 三、技术架构
@@ -88,6 +89,7 @@ interface PaperElement {
 cut/
 ├─ src/
 │  ├─ main.tsx / App.tsx
+│  ├─ assets/fonts/                       # 内置字体（Caveat/ZCOOL KuaiLe/Nunito，OFL）
 │  ├─ components/
 │  │  ├─ canvas/FabricCanvas.tsx        # 桥接壳（核心）
 │  │  ├─ toolbar/                        # 工具按钮
