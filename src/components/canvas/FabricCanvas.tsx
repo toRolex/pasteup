@@ -7,7 +7,7 @@
  * - 不依赖 fabric `toObject()` 默认行为，schema 字段显式读写。
  */
 import { useEffect, useRef, type MutableRefObject } from 'react';
-import { Canvas } from 'fabric';
+import { Canvas, FabricImage } from 'fabric';
 import type { PaperProject } from '../../types/project';
 import { createFabricPath } from '../../fabric/paperFactory';
 import { getZoom, panBy, resetViewport, zoomBy } from '../../fabric/viewport';
@@ -38,10 +38,22 @@ export interface FabricCanvasProps {
 function renderProject(canvas: Canvas, project: PaperProject): void {
   canvas.clear();
   canvas.setDimensions({ width: project.canvas.width, height: project.canvas.height });
-  for (const el of project.elements) {
-    canvas.add(createFabricPath(el));
-  }
+  for (const el of project.elements) canvas.add(createFabricPath(el));
+  applyBackground(canvas, project.bgPhoto);
   canvas.requestRenderAll();
+}
+
+function applyBackground(canvas: Canvas, bgPhoto: PaperProject['bgPhoto']): void {
+  if (!bgPhoto) {
+    canvas.backgroundImage = undefined;
+    return;
+  }
+  if (!bgPhoto.dataUrl) return;
+  void FabricImage.fromURL(bgPhoto.dataUrl).then((image) => {
+    image.visible = bgPhoto.visible;
+    canvas.backgroundImage = image;
+    canvas.requestRenderAll();
+  });
 }
 
 /** 从 fabric 画布对象显式读回 transform，回灌成新 project（单向向上，不写回原对象）。 */
@@ -137,6 +149,11 @@ export function FabricCanvas({ project, onProjectChange, onReady, apiRef }: Fabr
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    if (canvas.backgroundImage && project.bgPhoto) {
+      canvas.backgroundImage.visible = project.bgPhoto.visible;
+      canvas.requestRenderAll();
+      return;
+    }
     renderProject(canvas, project);
   }, [project]);
 

@@ -46,6 +46,20 @@ describe('projectStore（seam S2）— 当前项目单一来源', () => {
     expect(project.textures).toEqual([]);
   });
 
+  it('setBackgroundPhoto 写入底图 dataURL 并默认显示', () => {
+    useProjectStore.getState().setBackgroundPhoto('data:image/png;base64,AA');
+    expect(useProjectStore.getState().project.bgPhoto).toEqual({
+      dataUrl: 'data:image/png;base64,AA',
+      visible: true,
+    });
+  });
+
+  it('setBackgroundPhoto(null) 清除底图', () => {
+    useProjectStore.getState().setBackgroundPhoto('data:image/png;base64,AA');
+    useProjectStore.getState().setBackgroundPhoto(null);
+    expect(useProjectStore.getState().project.bgPhoto).toBeNull();
+  });
+
   it('setProject 替换当前 project（fabric 事件回灌通道）', () => {
     const next = { ...useProjectStore.getState().project, canvas: { width: 100, height: 200 } };
     useProjectStore.getState().setProject(next);

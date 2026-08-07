@@ -7,6 +7,8 @@ import { useProjectStore } from './store/projectStore';
 export default function App() {
   const project = useProjectStore((s) => s.project);
   const setProject = useProjectStore((s) => s.setProject);
+  const setBackgroundPhoto = useProjectStore((s) => s.setBackgroundPhoto);
+  const bgPhoto = project.bgPhoto;
   const apiRef = useRef<FabricCanvasApi | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
 
@@ -24,6 +26,36 @@ export default function App() {
               新建
             </button>
             <span className="brand-spacer" aria-hidden="true" />
+            <button
+              className="tool-btn"
+              data-testid="import-bg"
+              onClick={() => document.getElementById('bg-photo-input')?.click()}
+            >
+              导入底图
+            </button>
+            <input
+              id="bg-photo-input"
+              data-testid="bg-photo-input"
+              type="file"
+              accept="image/*"
+              hidden
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = () => setBackgroundPhoto(String(reader.result));
+                reader.readAsDataURL(file);
+              }}
+            />
+            {bgPhoto && (
+              <button
+                className="tool-btn"
+                data-testid="toggle-bg"
+                onClick={() => setProject({ ...project, bgPhoto: { ...bgPhoto, visible: !bgPhoto.visible } })}
+              >
+                {bgPhoto.visible ? '隐藏底图' : '显示底图'}
+              </button>
+            )}
             <button
               className="tool-btn"
               data-testid="zoom-out"
