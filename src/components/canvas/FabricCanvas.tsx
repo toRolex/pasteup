@@ -112,6 +112,7 @@ export function FabricCanvas({
   const containerElRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<Canvas | null>(null);
   const projectRef = useRef(project);
+  const prevProjectRef = useRef<PaperProject | null>(null);
   const onProjectChangeRef = useRef(onProjectChange);
   const onReadyRef = useRef(onReady);
   const apiRefRef = useRef(apiRef);
@@ -258,13 +259,27 @@ export function FabricCanvas({
 
   // 单向向下：project 变化时推送 elements 到画布。
   // renderProject 会 clear 重建对象，导致选中丢失；这里在重建后按 paperId 命令式恢复
-  // activeObject（React→fabric 单向命令式，不引入双向绑定）。bgPhoto 分支只切可见性，不动元素。
+  // activeObject（React→fabric 单向命令式，不引入双向绑定）。
+  // bgPhoto 分支只切可见性，不动元素——但仅当本次变化确实是「纯底图 visible 切换」才走
+  // 快速路径；undo/redo 恢复、描摹/变换回灌等会改 elements 的，必须全量 renderProject，
+  // 否则画布与 store 脱节（例如有底图时撤销纸片移动不会重绘）。
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    if (canvas.backgroundImage && project.bgPhoto) {
-      canvas.backgroundImage.visible = project.bgPhoto.visible;
-      canvas.requestRenderAll();
+    const prev = prevProjectRef.current;
+    prevProjectRef.current = project;
+    // 首帧（prev === null）与 elements/textures/canvas 引用或底图 dataUrl 变化 → 全量重绘
+    const bgOnlyChange =
+      prev !== null &&
+      project.elements === prev.elements &&
+      project.textures === prev.textures &&
+      project.canvas === prev.canvas &&
+      project.bgPhoto?.dataUrl === prev.bgPhoto?.dataUrl;
+    if (bgOnlyChange) {
+      if (canvas.backgroundImage && project.bgPhoto) {
+        canvas.backgroundImage.visible = project.bgPhoto.visible;
+        canvas.requestRenderAll();
+      }
       return;
     }
     const activePaperId = (canvas.getActiveObject() as { paperId?: string } | undefined)?.paperId;

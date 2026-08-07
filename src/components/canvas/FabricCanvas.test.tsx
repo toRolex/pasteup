@@ -439,4 +439,42 @@ describe('FabricCanvas 选择/变换（T6 seam 4/5）— select 模式自定义�
       scaleY: 1,
     });
   });
+
+  it('有底图时 undo/redo 恢复仍全量重绘（不落入 bgPhoto 快速路径）', async () => {
+    vi.spyOn(FabricImage, 'fromURL').mockResolvedValue({
+      width: 1200,
+      height: 800,
+      render: () => {},
+      dispose: () => {},
+    } as unknown as FabricImage);
+    let canvas: Canvas | undefined;
+    const base = createEmptyProject(1200, 800);
+    base.bgPhoto = { dataUrl: 'data:image/png;base64,AA', visible: true };
+    base.elements.push(createPaperElement({ path: RECT, color: '#c0392b' })); // 位置 A (0,0)
+
+    const moved = {
+      ...base,
+      elements: base.elements.map((el) => ({
+        ...el,
+        transform: { ...el.transform, x: 100, y: 200 },
+      })),
+    };
+    const restored = {
+      ...moved,
+      elements: moved.elements.map((el) => ({
+        ...el,
+        transform: { ...el.transform, x: 0, y: 0 },
+      })),
+    };
+
+    const { rerender } = render(<FabricCanvas project={base} onReady={(c) => { canvas = c; }} />);
+    await waitFor(() => expect(canvas!.backgroundImage).toBeDefined());
+    expect(canvas!.getObjects()[0].left).toBe(0);
+
+    rerender(<FabricCanvas project={moved} onReady={(c) => { canvas = c; }} />);
+    expect(canvas!.getObjects()[0].left).toBe(100);
+
+    rerender(<FabricCanvas project={restored} onReady={(c) => { canvas = c; }} />);
+    expect(canvas!.getObjects()[0].left).toBe(0);
+  });
 });
