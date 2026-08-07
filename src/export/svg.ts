@@ -1,0 +1,125 @@
+/**
+ * T13 导出 SVG。
+ *
+ * 主 seam：`postProcessSvg` 纯函数 —— fabric v7 `canvas.toSVG()` 输出的
+ * `<pattern>`/`<filter>` 在 `<g>` body 内（jsdom 实测），严格渲染器（Inkscape/librsvg）
+ * 要求收进 `<defs>`。
+ *
+ * ADR 0001 契约：纹理缩放/旋转在合成时预烘焙进最终位图，pattern 不设 transform
+ * （fabric v7 toSVG 会丢弃 patternTransform，运行时已烘焙故输出天然正确）；
+ * 导出时把 `<pattern>` 收进 `<defs>`，并断言无 `patternTransform`。
+ *
+ * 导出从 project schema 重建临时 StaticCanvas（不碰 live canvas，构造上排除底图），
+ * 纹理 dataURL 加载走注入的 `loadSource`（jsdom 不能真实解码图片，测试注入 fake source）。
+ */
+import { StaticCanvas } from 'fabric';
+import { createFabricPath } from '../fabric/paperFactory';
+import type { PaperProject } from '../types/project';
+
+/** 纹理源加载器（注入以便测试；浏览器默认实现见 loadTextureImage）。 */
+export type TextureSourceLoader = (dataUrl: string) => Promise<CanvasImageSource>;
+
+/**
+ * 把纹理 dataURL 加载为可被 `Pattern.toSVG()` 读取 width/height 的图片源。
+ * 浏览器实现：`new Image()` + `decode()`；jsdom 不实现图片解码（测试走注入，不调用本函数）。
+ */
+export async function loadTextureImage(dataUrl: string): Promise<CanvasImageSource> {
+  const img = new Image();
+  img.src = dataUrl;
+  if (typeof img.decode === 'function') {
+    await img.decode();
+  } else {
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error(`纹理图片加载失败: ${dataUrl.slice(0, 32)}`));
+    });
+  }
+  return img;
+}
+
+/**
+ * post-process 纯函数（主 seam，可测核心）。
+ *
+ * 1. 把 `<pattern>` 与 `<filter>` 从当前位置移入 `<defs>`（无 `<defs>` 时在 `<svg>` 内创建）。
+ * 2. 契约断言：任何 `<pattern>` 带 `patternTransform` 属性即抛错（ADR 0001，违反即导出错位）。
+ * 3. 纹理 dataURL 内嵌自包含、底图不含 —— 由上游 `buildRawSvg` 构造保证，此处原样保留。
+ */
+export function postProcessSvg(svg: string): string {
+  const doc = new DOMParser().parseFromString(svg, 'image/svg+xml');
+  const parserError = doc.querySelector('parsererror');
+  if (parserError) {
+    throw new Error(`SVG post-process: 无法解析 SVG: ${parserError.textContent ?? ''}`);
+  }
+  const root = doc.documentElement;
+
+  // ADR 0001 契约断言：pattern 不设 transform
+  for (const pattern of Array.from(doc.querySelectorAll('pattern'))) {
+    if (pattern.hasAttribute('patternTransform')) {
+      throw new Error('SVG post-process: pattern 含 patternTransform，违反 ADR 0001 契约');
+    }
+  }
+
+  let defs = doc.querySelector('defs');
+  if (!defs) {
+    defs = doc.createElementNS('http://www.w3.org/2000/svg', 'defs');
+    root.insertBefore(defs, root.firstChild);
+  }
+  // pattern/filter 收进 defs（严格渲染器 Inkscape/librsvg 要求；id 引用不变，原位置不留占位）
+  for (const selector of ['pattern', 'filter'] as const) {
+    for (const el of Array.from(doc.querySelectorAll(selector))) {
+      defs.appendChild(el);
+    }
+  }
+  return new XMLSerializer().serializeToString(doc);
+}
+
+/**
+ * 从 project schema 重建纸片并产出 fabric 原生 SVG（不含底图、不含 preamble）。
+ *
+ * @param sources textureId → 已加载纹理源（缺省/悬空引用回退纯色填充）。
+ */
+export function buildRawSvg(
+  project: PaperProject,
+  sources: Map<string, CanvasImageSource>,
+): string {
+  const canvas = new StaticCanvas(undefined, {
+    width: project.canvas.width,
+    height: project.canvas.height,
+  });
+  for (const el of project.elements) {
+    const textureSource = el.textureId ? sources.get(el.textureId) : undefined;
+    canvas.add(createFabricPath(el, textureSource));
+  }
+  return canvas.toSVG({ suppressPreamble: true });
+}
+
+/**
+ * 导出管线：加载纹理源 → 从 schema 重建 → post-process。
+ * @param loadSource 纹理 dataURL 加载器（默认浏览器 Image 加载；测试注入 fake）。
+ * @returns 规范化后的 SVG 字符串（pattern/filter 在 defs 内、无 patternTransform、自包含）。
+ */
+export async function exportProjectToSVG(
+  project: PaperProject,
+  loadSource: TextureSourceLoader = loadTextureImage,
+): Promise<string> {
+  const sources = new Map<string, CanvasImageSource>();
+  for (const texture of project.textures) {
+    sources.set(texture.id, await loadSource(texture.dataUrl));
+  }
+  return postProcessSvg(buildRawSvg(project, sources));
+}
+
+/**
+ * 浏览器下载保存 .svg（简单可靠；Tauri 文件对话框后续统一，T12 自动保存未做）。
+ */
+export function saveSvgFile(svg: string, filename = 'pasteup.svg'): void {
+  const blob = new Blob([svg], { type: 'image/svg+xml' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
