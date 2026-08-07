@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render } from '@testing-library/react';
-import { Canvas } from 'fabric';
+import { render, waitFor } from '@testing-library/react';
+import { Canvas, FabricImage } from 'fabric';
 import { FabricCanvas, type FabricCanvasApi } from './FabricCanvas';
 import {
   createEmptyProject,
@@ -40,6 +40,21 @@ describe('FabricCanvas 桥接壳（seam 6/7）', () => {
     expect(paper.top).toBe(48);
   });
 
+  it('渲染底图并在 visible 切换时保持纸片对象不变', async () => {
+    vi.spyOn(FabricImage, 'fromURL').mockResolvedValue({ width: 1200, height: 800, render: () => {}, dispose: () => {} } as unknown as FabricImage);
+    let canvas: Canvas | undefined;
+    const project = projectWithOnePaper();
+    project.bgPhoto = { dataUrl: 'data:image/png;base64,AA', visible: true };
+    const { rerender } = render(<FabricCanvas project={project} onReady={(c) => { canvas = c; }} />);
+    await waitFor(() => expect(canvas!.backgroundImage).toBeDefined());
+    expect(canvas!.backgroundImage!.visible).toBe(true);
+    const paper = canvas!.getObjects()[0];
+    const hidden = { ...project, bgPhoto: { ...project.bgPhoto, visible: false } };
+    rerender(<FabricCanvas project={hidden} onReady={(c) => { canvas = c; }} />);
+    expect(canvas!.backgroundImage!.visible).toBe(false);
+    expect(canvas!.getObjects()[0]).toBe(paper);
+  });
+
   it('单向通信：fabric 事件经 onProjectChange 回灌，不反向写回 props（无双向绑定）', () => {
     let canvas: Canvas | undefined;
     const onProjectChange = vi.fn();
@@ -76,7 +91,6 @@ describe('FabricCanvas 桥接壳（seam 6/7）', () => {
     });
   });
 });
-
 describe('FabricCanvas 导航 API（seam S5）— apiRef 只改视口不动元素', () => {
   it('apiRef 暴露 zoomBy/panBy/resetViewport，元素属性不变', () => {
     let canvas: Canvas | undefined;

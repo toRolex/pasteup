@@ -22,6 +22,8 @@ export interface ProjectStore {
   createProject: (orientation: CanvasOrientation, resolution: CanvasResolution) => void;
   /** 替换当前项目（fabric 事件回灌通道；T4+ 撤销栈会包一层）。 */
   setProject: (project: PaperProject) => void;
+  /** 设置或清除底图照片。 */
+  setBackgroundPhoto: (dataUrl: string | null) => void;
 }
 
 /** 按朝向 + 分辨率创建 A4 空项目。 */
@@ -43,4 +45,8 @@ export const useProjectStore = create<ProjectStore>()((set) => ({
   createProject: (orientation, resolution) =>
     set({ project: createProjectFrom(orientation, resolution) }),
   setProject: (project) => set({ project }),
+  setBackgroundPhoto: (dataUrl) =>
+    set((state) => ({
+      project: { ...state.project, bgPhoto: dataUrl ? { dataUrl, visible: true } : null },
+    })),
 }));
