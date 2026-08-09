@@ -177,3 +177,22 @@ describe('LayerPanel（T11）— 图层列表', () => {
     });
   });
 });
+
+describe('LayerPanel 左栏撕边拟物（T16 seam 8）— 目录页撕边标签', () => {
+  it('渲染 torn-paper 撕边标签（.torn-paper + layer-tab）', () => {
+    const elements = makePapers(2);
+    render(
+      <LayerPanel elements={elements} selectedId={null} onSelect={() => {}} onReorder={() => {}} />,
+    );
+    const tab = screen.getByTestId('layer-tab');
+    expect(tab.className).toContain('torn-paper');
+    expect(tab.textContent).toContain('目录');
+  });
+
+  it('空态同样保留撕边标签', () => {
+    render(
+      <LayerPanel elements={[]} selectedId={null} onSelect={() => {}} onReorder={() => {}} />,
+    );
+    expect(screen.getByTestId('layer-tab').className).toContain('torn-paper');
+  });
+});

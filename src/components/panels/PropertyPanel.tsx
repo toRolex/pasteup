@@ -6,6 +6,8 @@
  * 纹理相关变更经 propertyEdit.applyTextureProperty 触发重合成（tintCache 复用）。
  * MRU 色区归 T15 PalettePanel，本面板只放简洁内置色板 + 同步 currentColor。
  */
+import { useState } from 'react';
+import type { PaperProject } from '../../types/project';
 import { TEXTURE_STYLES } from '../../texture/generator';
 import { useProjectStore } from '../../store/projectStore';
 import { useEditorStore } from '../../store/editorStore';
@@ -26,6 +28,14 @@ export function PropertyPanel({ selectedId }: PropertyPanelProps) {
   const project = useProjectStore((s) => s.project);
   const commitProject = useProjectStore((s) => s.commitProject);
   const setCurrentColor = useEditorStore((s) => s.setCurrentColor);
+  /** T16 便签打勾：每次属性变更 bump tick，驱动「✓ 已更新」反馈重放动画。 */
+  const [tick, setTick] = useState(0);
+
+  /** 统一提交：写撤销历史 + 触发便签打勾反馈。 */
+  const commit = (next: PaperProject) => {
+    commitProject(next);
+    setTick((t) => t + 1);
+  };
 
   const element = selectedId
     ? project.elements.find((e) => e.id === selectedId)
@@ -53,6 +63,11 @@ export function PropertyPanel({ selectedId }: PropertyPanelProps) {
   return (
     <section className="property-panel" data-testid="property-panel">
       <h2 className="page-heading">属性</h2>
+      {tick > 0 && (
+        <span className="prop-tick" data-testid="property-check" key={tick} aria-label="已更新">
+          ✓ 已更新
+        </span>
+      )}
 
       <div className="property-field" data-testid="texture-field">
         <span className="property-label">纹理</span>
@@ -62,7 +77,7 @@ export function PropertyPanel({ selectedId }: PropertyPanelProps) {
             className={`texture-btn${activeStyle === null ? ' texture-btn--active' : ''}`}
             data-testid="texture-none"
             aria-pressed={activeStyle === null}
-            onClick={() => commitProject(removeTexture(project, element.id))}
+            onClick={() => commit(removeTexture(project, element.id))}
           >
             无
           </button>
@@ -74,7 +89,7 @@ export function PropertyPanel({ selectedId }: PropertyPanelProps) {
               data-testid={`texture-${s.id}`}
               aria-pressed={activeStyle === s.id}
               onClick={() =>
-                commitProject(applyTextureProperty(project, element.id, { style: s.id }))
+                commit(applyTextureProperty(project, element.id, { style: s.id }))
               }
             >
               {s.name}
@@ -99,7 +114,7 @@ export function PropertyPanel({ selectedId }: PropertyPanelProps) {
                   aria-pressed={active}
                   onClick={() => {
                     setCurrentColor(hex);
-                    commitProject(applyTextureProperty(project, element.id, { color: hex }));
+                    commit(applyTextureProperty(project, element.id, { color: hex }));
                   }}
                 />
               </li>
@@ -120,7 +135,7 @@ export function PropertyPanel({ selectedId }: PropertyPanelProps) {
             value={element.opacity}
             aria-label="不透明度"
             onChange={(e) =>
-              commitProject(applyOpacity(project, element.id, Number(e.target.value)))
+              commit(applyOpacity(project, element.id, Number(e.target.value)))
             }
           />
           <span className="property-value" data-testid="opacity-value">
@@ -141,7 +156,7 @@ export function PropertyPanel({ selectedId }: PropertyPanelProps) {
             value={scalePercent}
             aria-label="纹理缩放"
             onChange={(e) =>
-              commitProject(
+              commit(
                 applyTextureProperty(project, element.id, { scale: Number(e.target.value) / 100 }),
               )
             }
@@ -163,7 +178,7 @@ export function PropertyPanel({ selectedId }: PropertyPanelProps) {
               data-testid={`rotate-${deg}`}
               aria-pressed={rotate === deg}
               onClick={() =>
-                commitProject(applyTextureProperty(project, element.id, { rotate: deg }))
+                commit(applyTextureProperty(project, element.id, { rotate: deg }))
               }
             >
               {deg}°

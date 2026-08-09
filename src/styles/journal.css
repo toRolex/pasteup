@@ -345,6 +345,7 @@
 
 /* ── 右栏属性便签（T10 属性面板：纹理选择器 + 色板 + 属性）──────── */
 .property-panel {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 18px;
@@ -353,6 +354,23 @@
   background: var(--note);
   box-shadow: var(--shadow-lift);
   transform: rotate(1.2deg);
+}
+.property-panel::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 0;
+  border-style: solid;
+  border-width: 0 15px 15px 0;
+  border-color: transparent var(--note-deep) transparent transparent;
+}
+/* T16 便签打勾反馈 */
+.prop-tick {
+  align-self: flex-end;
+  font-family: var(--font-scrawl);
+  font-size: 14px;
+  color: var(--moss-deep);
+  animation: popNote 0.5s var(--ease-spring);
 }
 .property-field {
   display: flex;
@@ -546,4 +564,182 @@
 }
 .layer-op-btn:hover {
   background: var(--paper-deep);
+}
+
+/* ═══ T16 视觉打磨：逐字 / 描线 / 图章 / 手写圈注 / 撕边标签 ═══
+   按 03-open-journal 技法清单补全联动微交互与拟物装饰。 */
+
+/* ── 品牌标题容器 + 手绘下划线（后置描线）──────── */
+.brand-title {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.brand-underline {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  bottom: -5px;
+  width: calc(100% - 4px);
+  height: 10px;
+  pointer-events: none;
+}
+.underline-path {
+  stroke-dasharray: 320;
+  stroke-dashoffset: 320;
+  animation: draw 1.1s var(--ease-out) forwards 0.5s;
+}
+
+/* ── 逐字浮现（每字符经 --i 延迟 staggered）────── */
+.ch {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(0.5em) rotate(3deg);
+  white-space: pre;
+  animation: charIn 0.6s var(--ease-out) forwards;
+  animation-delay: calc(var(--i, 0) * 45ms);
+}
+
+/* ── 导出图章（盖戳动效）──────────────────────── */
+.stamp--export {
+  align-self: flex-start;
+  margin-top: 18px;
+  transform: rotate(-4deg);
+  opacity: 0;
+  animation:
+    stampIn 0.55s var(--ease-spring) forwards,
+    stampJitter 0.4s var(--ease-spring) 0.5s;
+}
+.stamp--export.stamped {
+  opacity: 1; /* 无动画环境（reduced / jsdom）下仍可见 */
+}
+
+/* ── 手写圈注（涂鸦圈 + 批注）──────────────────── */
+.page-scaffold {
+  position: relative;
+}
+.circle-note {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  pointer-events: none;
+  flex: none;
+}
+.circle-note-ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.circle-note-ring path {
+  fill: none;
+  stroke: var(--tape);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-dasharray: 118 14;
+  transform: rotate(-8deg);
+  transform-origin: center;
+  opacity: 0.85;
+}
+.circle-note-label {
+  font-family: var(--font-scrawl);
+  font-size: 13px;
+  line-height: 1;
+  color: var(--tape);
+  transform: rotate(-6deg);
+}
+.circle-note--export {
+  transform: rotate(6deg);
+  margin-left: -4px;
+}
+.circle-note--palette {
+  position: absolute;
+  top: 6px;
+  right: 10px;
+  transform: rotate(5deg);
+}
+
+/* ── 左栏撕边「目录」标签 ──────────────────────── */
+.layer-panel {
+  position: relative;
+}
+.layer-tab {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  transform: rotate(2deg);
+  padding: 5px 12px;
+  font-family: var(--font-scrawl);
+  font-size: 13px;
+  color: var(--ink);
+}
+
+/* ── T16 动效关键帧 ────────────────────────────── */
+@keyframes draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes charIn {
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes stampIn {
+  0% {
+    opacity: 0;
+    transform: scale(1.9) rotate(-12deg);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(0.92) rotate(-7deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(-4deg);
+  }
+}
+@keyframes stampJitter {
+  0%,
+  100% {
+    transform: scale(1) rotate(-4deg);
+  }
+  30% {
+    transform: scale(1.04) rotate(-2.4deg);
+  }
+  60% {
+    transform: scale(0.98) rotate(-5.4deg);
+  }
+}
+@keyframes popNote {
+  0% {
+    opacity: 0;
+    transform: translateX(-6px) rotate(-2deg);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ── reduced-motion：逐字 / 描线 / 图章重动效关闭，字符直接显示 ── */
+.journal[data-reduced-motion='true'] .ch {
+  opacity: 1;
+  transform: none;
+  animation: none;
+  transition: none;
+}
+.journal[data-reduced-motion='true'] .underline-path {
+  stroke-dashoffset: 0;
+  animation: none;
+}
+.journal[data-reduced-motion='true'] .stamp--export {
+  animation: none;
+  opacity: 1;
+  transform: rotate(-4deg);
 }

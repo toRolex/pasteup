@@ -167,3 +167,41 @@ describe('PropertyPanel 属性编辑（seam 3）— 经 commitProject 可撤销'
     expect(useProjectStore.getState().project.elements[0].opacity).toBe(0.4);
   });
 });
+
+describe('PropertyPanel 便签打勾（T16 seam 3）— 属性变更后出现打勾反馈', () => {
+  beforeEach(() => {
+    useProjectStore.setState({
+      project: createEmptyProject(1200, 800),
+      undoStack: [],
+      redoStack: [],
+    });
+    useEditorStore.setState({ currentColor: '#000000', recentColors: [] });
+  });
+
+  it('初始（未变更）不渲染打勾元素', () => {
+    useProjectStore.setState({ project: projectWithPaper() });
+    render(<PropertyPanel selectedId="paper-1" />);
+    expect(screen.queryByTestId('property-check')).toBeNull();
+  });
+
+  it('调整不透明度后出现打勾反馈（✓ 已更新）', () => {
+    useProjectStore.setState({ project: projectWithPaper() });
+    render(<PropertyPanel selectedId="paper-1" />);
+    fireEvent.change(screen.getByTestId('opacity-slider'), { target: { value: '0.4' } });
+    const check = screen.getByTestId('property-check');
+    expect(check).toBeInTheDocument();
+    expect(check.textContent).toContain('✓');
+    expect(check.className).toContain('prop-tick');
+  });
+
+  it('连续两次变更：打勾元素随变更重新出现（key 变化触发动画重放）', () => {
+    useProjectStore.setState({ project: projectWithPaper() });
+    render(<PropertyPanel selectedId="paper-1" />);
+    fireEvent.change(screen.getByTestId('opacity-slider'), { target: { value: '0.4' } });
+    const first = screen.getByTestId('property-check');
+    fireEvent.change(screen.getByTestId('opacity-slider'), { target: { value: '0.6' } });
+    const second = screen.getByTestId('property-check');
+    expect(first).not.toBe(second); // key 变更 → 新节点（动画可重放）
+    expect(second.textContent).toContain('✓');
+  });
+});
