@@ -15,6 +15,9 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 tauri = { version = "2", features = [] }
 tokio = { version = "1", features = ["sync", "time"] }
+# T12 自动保存/打开项目：文件对话框 + 文件读写
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
 
 # macOS 原生 NSColorSampler（屏幕取色，T15）。仅 macOS 编译，避免 Windows 交叉编译负担。
 [target.'cfg(target_os = "macos")'.dependencies]

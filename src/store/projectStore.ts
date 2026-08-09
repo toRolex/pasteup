@@ -23,6 +23,12 @@ import {
   type CanvasResolution,
 } from '../types/canvasSize';
 
+/**
+ * 保存状态（T12）：idle 未保存（尚无文件位置）/ saving 写盘中 / saved 已保存 /
+ * error 上次写盘失败。打开项目后置为 saved（刚读入磁盘内容）。
+ */
+export type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
+
 export interface ProjectStore {
   /** 当前项目（画布尺寸 / 底图 / 纸片 / 纹理）。 */
   project: PaperProject;
@@ -30,6 +36,10 @@ export interface ProjectStore {
   undoStack: PaperProject[];
   /** 重做栈：undo 时把当前状态 push 进来；新编辑（栈顶变更）后清空。 */
   redoStack: PaperProject[];
+  /** 当前项目文件路径；null 表示尚未选择位置（首次保存需弹保存对话框）。 */
+  savePath: string | null;
+  /** 自动保存状态（驱动顶栏「已保存/保存中」指示）。 */
+  saveStatus: SaveStatus;
   /** 新建项目：按朝向 + 分辨率初始化 A4 画布，内容字段重置为空，撤销/重做历史清空。 */
   createProject: (orientation: CanvasOrientation, resolution: CanvasResolution) => void;
   /** 替换当前项目（原始回灌/恢复通道；不写撤销历史——undo/redo 内部用它恢复）。 */
@@ -48,6 +58,15 @@ export interface ProjectStore {
   addPaper: (path: string, color?: string) => void;
   /** 重排纸片 z 序（数组序即 z 序；走撤销历史；边界 no-op 自动不入栈）。 */
   reorderElements: (id: string, op: 'up' | 'down' | 'top' | 'bottom') => void;
+  /** 记录当前项目文件路径（首次保存后 / 打开项目后调用）。 */
+  setSavePath: (path: string | null) => void;
+  /** 记录自动保存状态（驱动 UI 指示）。 */
+  setSaveStatus: (status: SaveStatus) => void;
+  /**
+   * 打开项目：替换 project + 清空撤销/重做栈（打开 = 新历史起点）+
+   * 记录打开文件路径 + saveStatus 置 saved（内容即磁盘内容）。
+   */
+  openProject: (project: PaperProject, savePath: string) => void;
 }
 
 /** 按朝向 + 分辨率创建 A4 空项目。 */
@@ -109,8 +128,17 @@ export const useProjectStore = create<ProjectStore>()((set) => ({
   project: createDefaultProject(),
   undoStack: [],
   redoStack: [],
+  savePath: null,
+  saveStatus: 'idle',
   createProject: (orientation, resolution) =>
-    set({ project: createProjectFrom(orientation, resolution), undoStack: [], redoStack: [] }),
+    set({
+      project: createProjectFrom(orientation, resolution),
+      undoStack: [],
+      redoStack: [],
+      // 新项目无文件位置：首次保存需重新弹保存对话框
+      savePath: null,
+      saveStatus: 'idle',
+    }),
   setProject: (project) => set({ project }),
   commitProject: (next) => set((state) => commitEdit(state, next)),
   undo: () =>
@@ -166,5 +194,15 @@ export const useProjectStore = create<ProjectStore>()((set) => ({
       const nextElements = compute(state.project.elements, id);
       // layerOps 边界 no-op 返回同引用 → commitEdit 自动识别 no-op 不入栈
       return commitEdit(state, { ...state.project, elements: nextElements });
+    }),
+  setSavePath: (path) => set({ savePath: path }),
+  setSaveStatus: (status) => set({ saveStatus: status }),
+  openProject: (project, savePath) =>
+    set({
+      project,
+      savePath,
+      saveStatus: 'saved',
+      undoStack: [],
+      redoStack: [],
     }),
 }));

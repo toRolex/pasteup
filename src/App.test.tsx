@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import App from './App';
 import { tokens } from './styles/tokens';
+import { createEmptyProject, createPaperElement } from './types/project';
 import {
   createDefaultProject,
   useProjectStore,
@@ -12,6 +13,32 @@ const saveSvgFileMock = vi.hoisted(() => vi.fn());
 vi.mock('./export/svg', () => ({
   exportProjectToSVG: exportProjectToSVGMock,
   saveSvgFile: saveSvgFileMock,
+}));
+
+// T12 — 自动保存控制器 + 项目文件 I/O 封装 mock（App 层只验接线，防抖/写盘逻辑在 io 单测覆盖）
+const createAutosaveControllerMock = vi.hoisted(() => vi.fn());
+const scheduleMock = vi.hoisted(() => vi.fn());
+const flushMock = vi.hoisted(() => vi.fn());
+const disposeMock = vi.hoisted(() => vi.fn());
+vi.mock('./io/autosave', () => ({
+  createAutosaveController: createAutosaveControllerMock,
+}));
+// 默认返回有效控制器（App 挂载 useEffect 立即创建；unmount 时调用 dispose 不能为 undefined）
+createAutosaveControllerMock.mockImplementation(() => ({
+  schedule: scheduleMock,
+  flush: flushMock,
+  dispose: disposeMock,
+}));
+
+const pickOpenPathMock = vi.hoisted(() => vi.fn());
+const pickSavePathMock = vi.hoisted(() => vi.fn());
+const readProjectFileMock = vi.hoisted(() => vi.fn());
+const writeProjectFileMock = vi.hoisted(() => vi.fn());
+vi.mock('./io/projectFile', () => ({
+  pickOpenPath: pickOpenPathMock,
+  pickSavePath: pickSavePathMock,
+  readProjectFile: readProjectFileMock,
+  writeProjectFile: writeProjectFileMock,
 }));
 
 const normalize = (s: string) => s.replace(/\s+/g, '');
@@ -253,5 +280,104 @@ describe('App 图层面板（T11）— 左栏图层列表 + 双向联动 + z 序
 
     fireEvent.click(screen.getByTestId('undo'));
     expect(useProjectStore.getState().project.elements.map((e) => e.id)).toEqual(ids);
+  });
+});
+
+describe('App 自动保存 + 打开项目（T12）— 顶栏按钮 + 保存状态 + store 接线', () => {
+  beforeEach(() => {
+    // mockClear 保留默认实现（App 挂载即 create + unmount 即 dispose），只清调用记录
+    createAutosaveControllerMock.mockClear();
+    scheduleMock.mockReset();
+    flushMock.mockReset();
+    disposeMock.mockReset();
+    pickOpenPathMock.mockReset();
+    pickSavePathMock.mockReset();
+    readProjectFileMock.mockReset();
+    writeProjectFileMock.mockReset();
+    useProjectStore.setState({
+      project: createDefaultProject(),
+      undoStack: [],
+      redoStack: [],
+      savePath: null,
+      saveStatus: 'idle',
+    });
+  });
+
+  it('顶栏渲染「打开」「保存」按钮与保存状态指示', () => {
+    render(<App />);
+    expect(screen.getByTestId('open-project')).toBeInTheDocument();
+    expect(screen.getByTestId('save-project')).toBeInTheDocument();
+    expect(screen.getByTestId('save-status')).toBeInTheDocument();
+  });
+
+  it('挂载后建立自动保存订阅：项目改动 → schedule（防抖写盘入口）', async () => {
+    render(<App />);
+    expect(scheduleMock).not.toHaveBeenCalled();
+
+    useProjectStore.getState().addPaper('M 0 0 L 1 0 L 0 1 Z');
+    await waitFor(() => expect(scheduleMock).toHaveBeenCalledTimes(1));
+  });
+
+  it('点击「保存」→ 触发 controller.flush（立即写盘）', async () => {
+    render(<App />);
+    fireEvent.click(screen.getByTestId('save-project'));
+    await waitFor(() => expect(flushMock).toHaveBeenCalledTimes(1));
+  });
+
+  it('保存状态指示：idle=未保存 / saving=保存中 / saved=已保存 / error=保存失败', () => {
+    render(<App />);
+    expect(screen.getByTestId('save-status')).toHaveTextContent('未保存');
+
+    act(() => useProjectStore.setState({ saveStatus: 'saving' }));
+    expect(screen.getByTestId('save-status')).toHaveTextContent('保存中');
+
+    act(() => useProjectStore.setState({ saveStatus: 'saved' }));
+    expect(screen.getByTestId('save-status')).toHaveTextContent('已保存');
+
+    act(() => useProjectStore.setState({ saveStatus: 'error' }));
+    expect(screen.getByTestId('save-status')).toHaveTextContent('保存失败');
+  });
+
+  it('点击「打开」→ 对话框选文件 → 读取解析 → 写入 store（project/savePath/saveStatus）', async () => {
+    pickOpenPathMock.mockResolvedValue('/tmp/project.json');
+    const opened = createEmptyProject(500, 400);
+    opened.elements.push(
+      createPaperElement({ id: 'restored', path: 'M 0 0 Z', color: '#000', seed: 9 }),
+    );
+    readProjectFileMock.mockResolvedValue(opened);
+
+    render(<App />);
+    fireEvent.click(screen.getByTestId('open-project'));
+
+    await waitFor(() => {
+      const st = useProjectStore.getState();
+      expect(st.project).toEqual(opened);
+      expect(st.savePath).toBe('/tmp/project.json');
+      expect(st.saveStatus).toBe('saved');
+    });
+    expect(pickOpenPathMock).toHaveBeenCalledTimes(1);
+    expect(readProjectFileMock).toHaveBeenCalledWith('/tmp/project.json');
+  });
+
+  it('「打开」用户取消 → 不读取、项目不变', async () => {
+    pickOpenPathMock.mockResolvedValue(null);
+    render(<App />);
+    fireEvent.click(screen.getByTestId('open-project'));
+
+    await waitFor(() => expect(pickOpenPathMock).toHaveBeenCalledTimes(1));
+    expect(readProjectFileMock).not.toHaveBeenCalled();
+    expect(useProjectStore.getState().project).toEqual(createDefaultProject());
+  });
+
+  it('「打开」文件损坏/解析失败 → 显示错误、不崩溃、项目不变', async () => {
+    pickOpenPathMock.mockResolvedValue('/tmp/project.json');
+    readProjectFileMock.mockRejectedValue(new Error('项目文件损坏'));
+
+    render(<App />);
+    fireEvent.click(screen.getByTestId('open-project'));
+
+    await waitFor(() => expect(screen.getByTestId('open-error')).toHaveTextContent(/项目文件损坏/));
+    expect(useProjectStore.getState().project).toEqual(createDefaultProject());
+    expect(useProjectStore.getState().savePath).toBeNull();
   });
 });
