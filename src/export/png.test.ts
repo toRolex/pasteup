@@ -158,3 +158,68 @@ describe('downloadPNG（T14 seam）', () => {
     clickSpy.mockRestore();
   });
 });
+
+describe('exportCanvasToPNG — live 画布像素一致性（带纹理纸片对象，T18-c）', () => {
+  interface LiveCanvasState extends FakeCanvasState {
+    objects: unknown[];
+    getObjects(): unknown[];
+  }
+
+  /** 构造带纸片对象（含 pattern 填充）的 fake live canvas：toDataURL 捕获调用时画布状态。 */
+  function fakeTexturedCanvas(objects: unknown[]) {
+    const state: LiveCanvasState = {
+      width: 2480,
+      height: 3508,
+      backgroundImage: undefined,
+      viewportTransform: [1, 0, 0, 1, 0, 0],
+      requestRenderAll: vi.fn(),
+      setViewportTransform: vi.fn(),
+      objects,
+      getObjects() {
+        return this.objects;
+      },
+      toDataURL: vi.fn(),
+    };
+    state.setViewportTransform = vi.fn((vpt: number[]) => {
+      state.viewportTransform = vpt;
+    });
+    const observed: Array<{ self: unknown; objects: unknown[]; fills: unknown[] }> = [];
+    // 用普通函数保留 this = 被导出的 live canvas（方法调用上下文）
+    state.toDataURL = vi.fn(function (this: LiveCanvasState) {
+      observed.push({
+        self: this,
+        objects: this.getObjects(),
+        fills: this.getObjects().map((o) => (o as { fill?: unknown }).fill),
+      });
+      return FAKE_DATA_URL;
+    });
+    return { state, canvas: state as unknown as Canvas, observed };
+  }
+
+  const texturedObjects = [
+    { paperId: 'paper-1', fill: { type: 'pattern', repeat: 'repeat', source: { src: 'DATA_A' } }, opacity: 1, left: 24, top: 48, angle: 33, scaleX: 1.5, scaleY: 0.5 },
+    { paperId: 'paper-2', fill: { type: 'pattern', repeat: 'repeat', source: { src: 'DATA_B' } }, opacity: 0.6, left: 500, top: 300, angle: -15, scaleX: 1, scaleY: 2.5 },
+  ];
+
+  it('导出直接以 live 画布为上下文调用 toDataURL（this=同一画布实例，非重建副本）', () => {
+    const project = createEmptyProject(2480, 3508);
+    const { canvas, observed } = fakeTexturedCanvas(texturedObjects);
+
+    exportCanvasToPNG(canvas, project);
+
+    expect(observed).toHaveLength(1);
+    expect(observed[0].self).toBe(canvas);
+  });
+
+  it('toDataURL 期间画布纸片对象原样保留（同一数组引用、pattern 填充未替换/未序列化）', () => {
+    const project = createEmptyProject(2480, 3508);
+    const { state, canvas, observed } = fakeTexturedCanvas(texturedObjects);
+
+    exportCanvasToPNG(canvas, project);
+
+    expect(observed[0].objects).toBe(state.objects);
+    expect(observed[0].objects).toHaveLength(2);
+    // pattern 填充保持引用不变（导出不重建对象、不剥离纹理状态 → 像素即画布像素）
+    observed[0].fills.forEach((f, i) => expect(f).toBe(texturedObjects[i].fill));
+  });
+});

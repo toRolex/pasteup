@@ -14,6 +14,7 @@ import {
   type PaperProject,
 } from '../types/project';
 import { createTextureLoader } from '../texture/loader';
+import { createFabricPath } from '../fabric/paperFactory';
 import {
   buildRawSvg,
   exportProjectToSVG,
@@ -22,6 +23,42 @@ import {
 } from './svg';
 
 const RECT = 'M 0 0 L 100 0 L 100 80 L 0 80 Z';
+
+/** 与运行时画布渲染对象一致的基准 transform：导出 `<g>` 矩阵必须等于它（T18-c 一致性核心断言）。 */
+function canvasRenderMatrix(
+  el: Parameters<typeof createFabricPath>[0],
+  source: CanvasImageSource | null | undefined,
+): number[] {
+  return createFabricPath(el, source).calcTransformMatrix() as unknown as number[];
+}
+
+/** 解析 SVG：每个含 `<path>` 的 `<g>` 提取矩阵 / fill / opacity / 组内 pattern 的纹理 href。 */
+function parseSvgGroups(svg: string) {
+  const doc = new DOMParser().parseFromString(svg, 'image/svg+xml');
+  const groups: Array<{
+    matrix: number[];
+    fill: string;
+    opacity: string | null;
+    stroke: string;
+    patternHref: string | null;
+  }> = [];
+  for (const g of Array.from(doc.querySelectorAll('g'))) {
+    const path = g.querySelector('path');
+    if (!path) continue;
+    const transform = g.getAttribute('transform') ?? '';
+    const m = transform.match(/matrix\(([^)]+)\)/);
+    const style = path.getAttribute('style') ?? '';
+    const image = g.querySelector('pattern image');
+    groups.push({
+      matrix: m ? m[1].trim().split(/\s+/).map(Number) : [],
+      fill: style.match(/fill:\s*([^;]+)/)?.[1]?.trim() ?? '',
+      opacity: style.match(/opacity:\s*([^;]+)/)?.[1]?.trim() ?? null,
+      stroke: style.match(/stroke:\s*([^;]+)/)?.[1]?.trim() ?? '',
+      patternHref: image?.getAttribute('xlink:href') ?? null,
+    });
+  }
+  return groups;
+}
 
 /** 与 fabric v7 Pattern.toSVG 一致的 pattern 片段（含 dataURL）。 */
 const PATTERN = `<pattern id="SVGID_0" x="0" y="0" width="0.64" height="0.6">
@@ -190,6 +227,156 @@ describe('buildRawSvg（S2）— 纸片纹理填充接线（textureId → dataUr
     // rotation=90 已应用：X 轴不再水平（纯缩放时 m[1]=0）
     expect(Math.abs(m[1])).toBeGreaterThan(0.1);
   });
+
+  it('非 90° 旋转 + 非 1 缩放：`<g>` 矩阵列向量精确还原 schema（rotation/scale 独立校验）', () => {
+    const project = createEmptyProject(1200, 800);
+    project.elements.push(
+      createPaperElement({
+        path: RECT,
+        color: '#c0392b',
+        transform: { x: 24, y: 48, rotation: 33, scaleX: 1.5, scaleY: 0.5 },
+      }),
+    );
+    const raw = buildRawSvg(project, new Map());
+    const groups = parseSvgGroups(raw);
+    expect(groups).toHaveLength(1);
+    const m = groups[0].matrix;
+
+    const rad = (33 * Math.PI) / 180;
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+    // 列向量长度 = scaleX / scaleY
+    expect(Math.hypot(m[0], m[1])).toBeCloseTo(1.5, 2);
+    expect(Math.hypot(m[2], m[3])).toBeCloseTo(0.5, 2);
+    // 旋转方向与 schema 一致（33°：cos>0、sin>0）
+    expect(m[0] / 1.5).toBeCloseTo(cos, 2);
+    expect(m[1] / 1.5).toBeCloseTo(sin, 2);
+    expect(m[2] / 0.5).toBeCloseTo(-sin, 2);
+    expect(m[3] / 0.5).toBeCloseTo(cos, 2);
+  });
+
+  it('同 path/同 transform 不同位置：`<g>` 平移差 == schema 位置差（位置映射独立校验，不依赖同一 factory 代理）', () => {
+    const project = createEmptyProject(1200, 800);
+    project.elements.push(
+      createPaperElement({
+        path: RECT,
+        color: '#c0392b',
+        transform: { x: 100, y: 50, rotation: 0, scaleX: 1, scaleY: 1 },
+      }),
+      createPaperElement({
+        path: RECT,
+        color: '#c0392b',
+        transform: { x: 400, y: 250, rotation: 0, scaleX: 1, scaleY: 1 },
+      }),
+    );
+    const raw = buildRawSvg(project, new Map());
+    const groups = parseSvgGroups(raw);
+    expect(groups).toHaveLength(2);
+    const [mA, mB] = groups.map((g) => g.matrix);
+    // fabric.Path 矩阵平移含原点偏移（path 包围盒中心）；两纸片同 path/同旋转/同缩放
+    // → 偏移常数彼此抵消，平移差即 schema 位置差（不受 fabric 内部偏移公式影响）。
+    expect(mA[4] - mB[4]).toBeCloseTo(100 - 400, 2);
+    expect(mA[5] - mB[5]).toBeCloseTo(50 - 250, 2);
+  });
+
+  it('导出 `<g>` 矩阵 == 画布渲染对象 calcTransformMatrix（位置/旋转/缩放与实时画布一致）', () => {
+    const project = createEmptyProject(1200, 800);
+    project.elements.push(
+      createPaperElement({
+        path: RECT,
+        color: '#c0392b',
+        textureId: 'tex-1',
+        transform: { x: 24, y: 48, rotation: 33, scaleX: 1.5, scaleY: 0.5 },
+      }),
+    );
+    project.textures.push(
+      createPaperTexture({
+        id: 'tex-1',
+        style: 'fold',
+        seed: 1,
+        color: '#c0392b',
+        dataUrl: 'data:image/png;base64,AAAA',
+      }),
+    );
+    const sources = new Map([['tex-1', fakeSource]]);
+    const raw = buildRawSvg(project, sources);
+    const groups = parseSvgGroups(raw);
+    expect(groups).toHaveLength(1);
+
+    const expected = canvasRenderMatrix(project.elements[0], sources.get('tex-1'));
+    groups[0].matrix.forEach((v, i) => expect(v).toBeCloseTo(expected[i], 2));
+  });
+
+  it('多纸片各自 transform + 各自纹理：每个 `<g>` 矩阵与其 schema 对应、纹理各自内嵌不串', () => {
+    const project = createEmptyProject(1200, 800);
+    project.textures.push(
+      createPaperTexture({ id: 'tex-1', style: 'fold', seed: 1, color: '#c0392b', dataUrl: 'DATA_A' }),
+      createPaperTexture({ id: 'tex-2', style: 'fold', seed: 2, color: '#2e86c1', dataUrl: 'DATA_B' }),
+    );
+    const elA = createPaperElement({
+      path: RECT,
+      color: '#c0392b',
+      textureId: 'tex-1',
+      opacity: 1,
+      transform: { x: 10, y: 20, rotation: 33, scaleX: 1.5, scaleY: 1 },
+    });
+    const elB = createPaperElement({
+      path: RECT,
+      color: '#2e86c1',
+      textureId: 'tex-2',
+      opacity: 0.6,
+      transform: { x: 500, y: 300, rotation: -15, scaleX: 1, scaleY: 2.5 },
+    });
+    project.elements.push(elA, elB);
+
+    const sources = new Map([
+      ['tex-1', { ...fakeSource, src: 'DATA_A' } as unknown as CanvasImageSource],
+      ['tex-2', { ...fakeSource, src: 'DATA_B' } as unknown as CanvasImageSource],
+    ]);
+    const raw = buildRawSvg(project, sources);
+    const groups = parseSvgGroups(raw);
+    expect(groups).toHaveLength(2);
+
+    // 按纹理 href 定位 group，验证矩阵与对应元素 schema 一致（不串位姿）
+    const groupA = groups.find((g) => g.patternHref === 'DATA_A')!;
+    const groupB = groups.find((g) => g.patternHref === 'DATA_B')!;
+    const expectedA = canvasRenderMatrix(elA, sources.get('tex-1'));
+    const expectedB = canvasRenderMatrix(elB, sources.get('tex-2'));
+    groupA.matrix.forEach((v, i) => expect(v).toBeCloseTo(expectedA[i], 2));
+    groupB.matrix.forEach((v, i) => expect(v).toBeCloseTo(expectedB[i], 2));
+    // 各自 opacity 跟随元素
+    expect(groupA.opacity).toBe('1');
+    expect(groupB.opacity).toBe('0.6');
+  });
+
+  it('纯色纸片填充色 = element.color（hex → rgb 输出），描边 = 加深色（厚度质感）', () => {
+    const project = createEmptyProject(1200, 800);
+    project.elements.push(
+      createPaperElement({ path: RECT, color: '#c0392b', transform: { x: 24, y: 48, rotation: 0, scaleX: 1, scaleY: 1 } }),
+    );
+    const raw = buildRawSvg(project, new Map());
+    const groups = parseSvgGroups(raw);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].fill).toBe('rgb(192,57,43)');
+    // #c0392b × 0.82 → rgb(157,47,35)，与运行时同一 factory 产物一致
+    expect(groups[0].stroke).toBe('rgb(157,47,35)');
+  });
+
+  it('opacity 正确导出到 `<path>` style（含纹理纸片）', () => {
+    const project = createEmptyProject(1200, 800);
+    project.textures.push(
+      createPaperTexture({ id: 'tex-1', style: 'fold', seed: 1, color: '#c0392b', dataUrl: 'data:image/png;base64,AAAA' }),
+    );
+    project.elements.push(
+      createPaperElement({ path: RECT, color: '#c0392b', opacity: 0.85, textureId: 'tex-1' }),
+    );
+    const raw = buildRawSvg(project, new Map([['tex-1', fakeSource]]));
+    const groups = parseSvgGroups(raw);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].opacity).toBe('0.85');
+    // 含纹理时 fill 为 pattern 引用（纹理优先，颜色烘焙在 dataURL 内）
+    expect(groups[0].fill).toMatch(/^url\(#/);
+  });
 });
 
 describe('exportProjectToSVG（S3）— 导出管线（注入共享 loader）', () => {
@@ -266,6 +453,50 @@ describe('exportProjectToSVG（S3）— 导出管线（注入共享 loader）', 
     await exportProjectToSVG(project, loader);
 
     expect(load).toHaveBeenCalledTimes(1);
+  });
+
+  it('两个不同纹理纸片端到端：post-process 后各自 pattern 收进 defs、path 引用各自纹理 id（不串纹理）', async () => {
+    const project = createEmptyProject(1200, 800);
+    project.textures.push(
+      createPaperTexture({ id: 'tex-1', style: 'fold', seed: 1, color: '#c0392b', dataUrl: 'DATA_A' }),
+      createPaperTexture({ id: 'tex-2', style: 'fold', seed: 2, color: '#2e86c1', dataUrl: 'DATA_B' }),
+    );
+    project.elements.push(
+      createPaperElement({
+        path: RECT,
+        color: '#c0392b',
+        textureId: 'tex-1',
+        transform: { x: 10, y: 20, rotation: 33, scaleX: 1.5, scaleY: 1 },
+      }),
+      createPaperElement({
+        path: RECT,
+        color: '#2e86c1',
+        textureId: 'tex-2',
+        transform: { x: 500, y: 300, rotation: -15, scaleX: 1, scaleY: 2.5 },
+      }),
+    );
+    const load = vi.fn(async (href: string) => ({ ...fakeSource, src: href }) as CanvasImageSource);
+    const loader = createTextureLoader({ load });
+
+    const svg = await exportProjectToSVG(project, loader);
+
+    // 两个纹理 dataURL 均内嵌于 defs
+    const defs = defsSection(svg);
+    expect(defs).toContain('DATA_A');
+    expect(defs).toContain('DATA_B');
+    // 两个 path 各引用一个 pattern id，且 id 互不相同
+    const fillRefs = Array.from(svg.matchAll(/fill:\s*url\(#([^)]+)\)/g)).map((m) => m[1]);
+    expect(fillRefs).toHaveLength(2);
+    expect(fillRefs[0]).not.toBe(fillRefs[1]);
+    // 各自 pattern 的 xlink:href 对应各自纹理（A 不引用 B 的图，反之亦然）
+    const hrefById = new Map(
+      Array.from(svg.matchAll(/<pattern id="([^"]+)"[^>]*>[\s\S]*?xlink:href="([^"]+)"/g)).map((m) => [
+        m[1],
+        m[2],
+      ]),
+    );
+    expect(hrefById.get(fillRefs[0])).toBe('DATA_A');
+    expect(hrefById.get(fillRefs[1])).toBe('DATA_B');
   });
 });
 
