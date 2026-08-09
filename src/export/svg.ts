@@ -10,32 +10,13 @@
  * 导出时把 `<pattern>` 收进 `<defs>`，并断言无 `patternTransform`。
  *
  * 导出从 project schema 重建临时 StaticCanvas（不碰 live canvas，构造上排除底图），
- * 纹理 dataURL 加载走注入的 `loadSource`（jsdom 不能真实解码图片，测试注入 fake source）。
+ * 纹理 dataURL 加载走共享纹理加载器（`src/texture/loader.ts`，与运行时共用同一条管线，
+ * 同一 dataURL 解码结果复用；jsdom 不能真实解码图片，测试注入 fake loader）。
  */
 import { StaticCanvas } from 'fabric';
 import { createFabricPath } from '../fabric/paperFactory';
+import { textureSourceLoader, type TextureLoader } from '../texture/loader';
 import type { PaperProject } from '../types/project';
-
-/** 纹理源加载器（注入以便测试；浏览器默认实现见 loadTextureImage）。 */
-export type TextureSourceLoader = (dataUrl: string) => Promise<CanvasImageSource>;
-
-/**
- * 把纹理 dataURL 加载为可被 `Pattern.toSVG()` 读取 width/height 的图片源。
- * 浏览器实现：`new Image()` + `decode()`；jsdom 不实现图片解码（测试走注入，不调用本函数）。
- */
-export async function loadTextureImage(dataUrl: string): Promise<CanvasImageSource> {
-  const img = new Image();
-  img.src = dataUrl;
-  if (typeof img.decode === 'function') {
-    await img.decode();
-  } else {
-    await new Promise<void>((resolve, reject) => {
-      img.onload = () => resolve();
-      img.onerror = () => reject(new Error(`纹理图片加载失败: ${dataUrl.slice(0, 32)}`));
-    });
-  }
-  return img;
-}
 
 /**
  * post-process 纯函数（主 seam，可测核心）。
@@ -94,17 +75,17 @@ export function buildRawSvg(
 }
 
 /**
- * 导出管线：加载纹理源 → 从 schema 重建 → post-process。
- * @param loadSource 纹理 dataURL 加载器（默认浏览器 Image 加载；测试注入 fake）。
+ * 导出管线：经共享纹理加载器加载纹理源（同一 dataURL 复用）→ 从 schema 重建 → post-process。
+ * @param loader 共享纹理加载器（默认应用级单例；测试注入 fake）。
  * @returns 规范化后的 SVG 字符串（pattern/filter 在 defs 内、无 patternTransform、自包含）。
  */
 export async function exportProjectToSVG(
   project: PaperProject,
-  loadSource: TextureSourceLoader = loadTextureImage,
+  loader: TextureLoader = textureSourceLoader,
 ): Promise<string> {
   const sources = new Map<string, CanvasImageSource>();
   for (const texture of project.textures) {
-    sources.set(texture.id, await loadSource(texture.dataUrl));
+    sources.set(texture.id, await loader.load(texture.dataUrl));
   }
   return postProcessSvg(buildRawSvg(project, sources));
 }

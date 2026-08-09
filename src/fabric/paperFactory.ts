@@ -68,14 +68,13 @@ function darkenColor(hex: string, factor: number): string {
 /**
  * 依据纸片 schema 创建带基础样式（层叠投影 + 厚度质感）的 fabric.Path 对象。
  * @param element 纸片 schema。
- * @param textureSource 纹理填充源（ADR 0001 预烘焙结果）：T13 导出传入已加载的
- *   `CanvasImageSource`（Image/Canvas，Pattern.toSVG 需读 width/height）；string dataURL
- *   为 T8 遗留占位（运行时接线尚未做，仅承载 dataURL 契约）。传入时用 pattern 填充
- *   （repeat，**不设 patternTransform**），未传保持纯色填充。
+ * @param textureSource 纹理填充源（ADR 0001 预烘焙结果）：T18 传入共享加载器已解码的
+ *   `CanvasImageSource`（Image/Canvas，Pattern.toSVG 需读 width/height）。传入时用
+ *   pattern 填充（repeat，**不设 patternTransform**），未传保持纯色填充（占位）。
  */
 export function createFabricPath(
   element: PaperElement,
-  textureSource?: string | CanvasImageSource | null,
+  textureSource?: CanvasImageSource | null,
 ): Path {
   const { path, ...options } = paperToFabricOptions(element);
   const fabricPath = new Path(path, options);
@@ -83,7 +82,7 @@ export function createFabricPath(
     // ADR 0001 硬性契约：纹理缩放/旋转已在合成时烘焙进位图，pattern 不设 transform，
     // 运行时与导出共用同一数据源，导出天然正确。
     fabricPath.fill = new Pattern({
-      source: textureSource as unknown as CanvasImageSource,
+      source: textureSource,
       repeat: 'repeat',
     });
   }

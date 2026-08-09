@@ -13,6 +13,7 @@ import {
   createPaperTexture,
   type PaperProject,
 } from '../types/project';
+import { createTextureLoader } from '../texture/loader';
 import {
   buildRawSvg,
   exportProjectToSVG,
@@ -191,7 +192,7 @@ describe('buildRawSvg（S2）— 纸片纹理填充接线（textureId → dataUr
   });
 });
 
-describe('exportProjectToSVG（S3）— 导出管线（注入 loadSource）', () => {
+describe('exportProjectToSVG（S3）— 导出管线（注入共享 loader）', () => {
   const fakeSource = {
     width: 64,
     height: 48,
@@ -217,11 +218,12 @@ describe('exportProjectToSVG（S3）— 导出管线（注入 loadSource）', ()
         dataUrl: 'data:image/png;base64,AAAA',
       }),
     );
-    const loadSource = vi.fn(async () => fakeSource as CanvasImageSource);
+    const load = vi.fn(async () => fakeSource as CanvasImageSource);
+    const loader = createTextureLoader({ load });
 
-    const svg = await exportProjectToSVG(project, loadSource);
+    const svg = await exportProjectToSVG(project, loader);
 
-    expect(loadSource).toHaveBeenCalledWith('data:image/png;base64,AAAA');
+    expect(load).toHaveBeenCalledWith('data:image/png;base64,AAAA');
     expect(defsSection(svg)).toContain('<pattern');
     expect(svg).toContain('data:image/png;base64,AAAA');
     expect(svg).not.toContain('patternTransform');
@@ -235,11 +237,35 @@ describe('exportProjectToSVG（S3）— 导出管线（注入 loadSource）', ()
 
   it('空项目导出为合法 SVG 根（无 pattern/无底图）', async () => {
     const project = createEmptyProject(2480, 3508);
-    const svg = await exportProjectToSVG(project, async () => fakeSource as CanvasImageSource);
+    const loader = createTextureLoader({ load: async () => fakeSource as CanvasImageSource });
+    const svg = await exportProjectToSVG(project, loader);
     expect(svg).toContain('<svg');
     expect(svg).toContain('width="2480"');
     expect(svg).toContain('height="3508"');
     expect(svg).not.toContain('<pattern');
+  });
+
+  it('同一 dataURL 多个纹理记录去重：共享 loader 只调用一次（T18 共用管线）', async () => {
+    const project = createEmptyProject(200, 200);
+    project.textures.push(
+      createPaperTexture({ id: 'tex-1', style: 'fold', seed: 1, color: '#c0392b', dataUrl: 'D1' }),
+      createPaperTexture({ id: 'tex-2', style: 'fold', seed: 2, color: '#c0392b', dataUrl: 'D1' }),
+    );
+    project.elements.push(
+      createPaperElement({ path: RECT, color: '#c0392b', textureId: 'tex-1' }),
+      createPaperElement({
+        path: RECT,
+        color: '#c0392b',
+        textureId: 'tex-2',
+        transform: { x: 120, y: 0, rotation: 0, scaleX: 1, scaleY: 1 },
+      }),
+    );
+    const load = vi.fn(async () => fakeSource as CanvasImageSource);
+    const loader = createTextureLoader({ load });
+
+    await exportProjectToSVG(project, loader);
+
+    expect(load).toHaveBeenCalledTimes(1);
   });
 });
 

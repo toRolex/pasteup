@@ -2,12 +2,64 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, waitFor } from '@testing-library/react';
 import { Canvas, FabricImage, Pattern, Point, type TPointerEventInfo } from 'fabric';
 import { FabricCanvas, type FabricCanvasApi } from './FabricCanvas';
+import type { TextureLoader } from '../../texture/loader';
 import {
   createEmptyProject,
   createPaperElement,
   createPaperTexture,
   type PaperProject,
 } from '../../types/project';
+
+/** jsdom fake 已解码图像源（真实管线在浏览器/Image decode，测试注入）。 */
+const FAKE_SOURCE = {
+  width: 64,
+  height: 48,
+  src: 'data:image/png;base64,TEX',
+} as unknown as CanvasImageSource;
+
+interface Deferred<T> {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+  reject: (reason?: unknown) => void;
+}
+
+function deferred<T>(): Deferred<T> {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
+/** 可控 fake 纹理加载器：按 dataUrl 返回待决 Promise，测试手动 resolve/reject。 */
+function deferredLoader(): TextureLoader & {
+  resolve: (url: string, src: CanvasImageSource) => void;
+  reject: (url: string, reason?: unknown) => void;
+} {
+  const pending = new Map<string, Deferred<CanvasImageSource>>();
+  const load = vi.fn((dataUrl: string) => {
+    const d = deferred<CanvasImageSource>();
+    pending.set(dataUrl, d);
+    return d.promise;
+  });
+  return {
+    load,
+    size: 0,
+    clear: vi.fn(),
+    resolve(url, src) {
+      pending.get(url)?.resolve(src);
+    },
+    reject(url, reason) {
+      pending.get(url)?.reject(reason);
+    },
+  };
+}
+
+function patternSource(fill: unknown): unknown {
+  return (fill as { source?: unknown } | undefined)?.source;
+}
 
 function projectWithOnePaper(
   transform = { x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1 },
@@ -549,11 +601,12 @@ describe('FabricCanvas 选中联动（T10 seam 4）— fabric 选中 → React �
   });
 });
 
-describe('FabricCanvas 纹理填充接线（T10 seam 5 / T8 遗留）— textureId → textures 表 dataUrl', () => {
+describe('FabricCanvas 运行时纹理管线（T18）— textureId → 共享加载器 → 占位后更新 Pattern', () => {
   const RECT = 'M 0 0 L 100 0 L 100 80 L 0 80 Z';
 
-  it('textureId 引用的纸片用 textures 表 dataUrl 做 Pattern 填充', () => {
+  it('textureId 引用的纸片：加载完成前纯色占位，加载完成后更新为 Pattern 填充并重绘', async () => {
     let canvas: Canvas | undefined;
+    const loader = deferredLoader();
     const project = createEmptyProject(1200, 800);
     project.textures.push(
       createPaperTexture({
@@ -561,8 +614,6 @@ describe('FabricCanvas 纹理填充接线（T10 seam 5 / T8 遗留）— texture
         style: 'fold',
         seed: 42,
         color: '#7A8B5C',
-        scale: 1,
-        rotate: 0,
         dataUrl: 'data:image/png;base64,TEX',
       }),
     );
@@ -570,10 +621,18 @@ describe('FabricCanvas 纹理填充接线（T10 seam 5 / T8 遗留）— texture
       createPaperElement({ path: RECT, color: '#7A8B5C', textureId: 'tex-1' }),
     );
 
-    render(<FabricCanvas project={project} onReady={(c) => { canvas = c; }} />);
+    render(
+      <FabricCanvas project={project} onReady={(c) => { canvas = c; }} textureLoader={loader} />,
+    );
     const paper = canvas!.getObjects()[0];
-    expect(paper.fill).toBeInstanceOf(Pattern);
+    expect(paper.fill).toBe('#7A8B5C'); // 占位纯色（未解码前不设 Pattern）
+
+    loader.resolve('data:image/png;base64,TEX', FAKE_SOURCE);
+    await waitFor(() => expect(paper.fill).toBeInstanceOf(Pattern));
+    // 运行时图案填充源是已解码的图像源对象，而非 dataURL 字符串
+    expect(patternSource(paper.fill)).toBe(FAKE_SOURCE);
     expect((paper.fill as unknown as { repeat?: string }).repeat).toBe('repeat');
+    expect(canvas!.requestRenderAll).toBeDefined();
   });
 
   it('textureId 指向缺失记录时保持纯色填充（不抛错）', () => {
@@ -586,5 +645,156 @@ describe('FabricCanvas 纹理填充接线（T10 seam 5 / T8 遗留）— texture
     render(<FabricCanvas project={project} onReady={(c) => { canvas = c; }} />);
     const paper = canvas!.getObjects()[0];
     expect(paper.fill).toBe('#c0392b');
+  });
+});
+
+describe('FabricCanvas 纹理管线鲁棒性（T18）— 独立加载 / 失败回退 / 防旧覆盖', () => {
+  const RECT = 'M 0 0 L 100 0 L 100 80 L 0 80 Z';
+
+  it('多纸片各自独立加载互不影响：先完成的更新自己，另一张保持占位', async () => {
+    let canvas: Canvas | undefined;
+    const loader = deferredLoader();
+    const project = createEmptyProject(1200, 800);
+    project.textures.push(
+      createPaperTexture({ id: 'tex-1', style: 'fold', seed: 1, color: '#c0392b', dataUrl: 'D1' }),
+      createPaperTexture({ id: 'tex-2', style: 'fold', seed: 2, color: '#c0392b', dataUrl: 'D2' }),
+    );
+    project.elements.push(
+      createPaperElement({ path: RECT, color: '#c0392b', textureId: 'tex-1' }),
+      createPaperElement({
+        path: RECT,
+        color: '#c0392b',
+        textureId: 'tex-2',
+        transform: { x: 200, y: 0, rotation: 0, scaleX: 1, scaleY: 1 },
+      }),
+    );
+
+    render(
+      <FabricCanvas project={project} onReady={(c) => { canvas = c; }} textureLoader={loader} />,
+    );
+    const [p1, p2] = canvas!.getObjects();
+    expect(p1.fill).toBe('#c0392b');
+    expect(p2.fill).toBe('#c0392b');
+
+    loader.resolve('D1', FAKE_SOURCE);
+    await waitFor(() => expect(p1.fill).toBeInstanceOf(Pattern));
+    expect(patternSource(p1.fill)).toBe(FAKE_SOURCE);
+    expect(p2.fill).toBe('#c0392b'); // 另一张仍占位，互不影响
+
+    loader.resolve('D2', FAKE_SOURCE);
+    await waitFor(() => expect(p2.fill).toBeInstanceOf(Pattern));
+    expect(p1.fill).toBeInstanceOf(Pattern);
+  });
+
+  it('纹理加载失败：纸片回退纯色，不抛错、不中断画布', async () => {
+    let canvas: Canvas | undefined;
+    const loader = deferredLoader();
+    const project = createEmptyProject(1200, 800);
+    project.textures.push(
+      createPaperTexture({ id: 'tex-1', style: 'fold', seed: 1, color: '#c0392b', dataUrl: 'D1' }),
+    );
+    project.elements.push(createPaperElement({ path: RECT, color: '#c0392b', textureId: 'tex-1' }));
+
+    render(
+      <FabricCanvas project={project} onReady={(c) => { canvas = c; }} textureLoader={loader} />,
+    );
+    const paper = canvas!.getObjects()[0];
+    expect(paper.fill).toBe('#c0392b');
+
+    loader.reject('D1', new Error('load fail'));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(paper.fill).toBe('#c0392b'); // 保持纯色
+    expect(canvas!.getObjects()).toHaveLength(1); // 画布不中断、不白屏
+  });
+
+  it('快速连续编辑：旧纹理加载结果不覆盖新渲染（防旧覆盖）', async () => {
+    let canvas: Canvas | undefined;
+    const loader = deferredLoader();
+    const projectA = createEmptyProject(1200, 800);
+    projectA.textures.push(
+      createPaperTexture({ id: 'tex-1', style: 'fold', seed: 1, color: '#7A8B5C', dataUrl: 'D1' }),
+    );
+    projectA.elements.push(
+      createPaperElement({ path: RECT, color: '#7A8B5C', textureId: 'tex-1' }),
+    );
+    const projectB = createEmptyProject(1200, 800);
+    projectB.textures.push(
+      createPaperTexture({ id: 'tex-2', style: 'fold', seed: 2, color: '#7A8B5C', dataUrl: 'D2' }),
+    );
+    projectB.elements.push(
+      createPaperElement({ path: RECT, color: '#7A8B5C', textureId: 'tex-2' }),
+    );
+
+    const { rerender } = render(
+      <FabricCanvas project={projectA} onReady={(c) => { canvas = c; }} textureLoader={loader} />,
+    );
+    rerender(
+      <FabricCanvas project={projectB} onReady={(c) => { canvas = c; }} textureLoader={loader} />,
+    );
+    const current = canvas!.getObjects()[0];
+    expect(current.fill).toBe('#7A8B5C'); // 新渲染占位
+
+    // 旧纹理（D1）先加载完成 → 必须被丢弃，不覆盖新渲染
+    loader.resolve('D1', FAKE_SOURCE);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(current.fill).toBe('#7A8B5C');
+
+    // 新纹理（D2）加载完成 → 正常应用
+    loader.resolve('D2', FAKE_SOURCE);
+    await waitFor(() => expect(current.fill).toBeInstanceOf(Pattern));
+    expect(patternSource(current.fill)).toBe(FAKE_SOURCE);
+  });
+
+  it('同一纸片纹理重合成（同 id 新 dataUrl）：旧加载结果被丢弃，新纹理正常应用', async () => {
+    let canvas: Canvas | undefined;
+    const loader = deferredLoader();
+    const projectA = createEmptyProject(1200, 800);
+    projectA.textures.push(
+      createPaperTexture({ id: 'tex-1', style: 'fold', seed: 1, color: '#7A8B5C', dataUrl: 'D1' }),
+    );
+    projectA.elements.push(
+      createPaperElement({ id: 'paper-1', path: RECT, color: '#7A8B5C', textureId: 'tex-1' }),
+    );
+    // 用户改色/缩放 → 同一纹理记录重合成出新 dataURL（同 id，D1 → D2），纸片 id 不变
+    const projectB = createEmptyProject(1200, 800);
+    projectB.textures.push(
+      createPaperTexture({ id: 'tex-1', style: 'fold', seed: 1, color: '#C0392B', dataUrl: 'D2' }),
+    );
+    projectB.elements.push(
+      createPaperElement({ id: 'paper-1', path: RECT, color: '#C0392B', textureId: 'tex-1' }),
+    );
+
+    const { rerender } = render(
+      <FabricCanvas project={projectA} onReady={(c) => { canvas = c; }} textureLoader={loader} />,
+    );
+    rerender(
+      <FabricCanvas project={projectB} onReady={(c) => { canvas = c; }} textureLoader={loader} />,
+    );
+    const current = canvas!.getObjects()[0];
+    expect(current.fill).toBe('#C0392B'); // 新渲染占位
+
+    // 旧纹理（D1）先加载完成 → 同纸片当前 dataUrl 已是 D2，必须丢弃不覆盖
+    loader.resolve('D1', FAKE_SOURCE);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(current.fill).toBe('#C0392B');
+
+    // 新纹理（D2）加载完成 → 正常应用
+    loader.resolve('D2', FAKE_SOURCE);
+    await waitFor(() => expect(current.fill).toBeInstanceOf(Pattern));
+    expect(patternSource(current.fill)).toBe(FAKE_SOURCE);
+  });
+
+  it('无纹理纸片保持纯色填充（现状不变）', () => {
+    let canvas: Canvas | undefined;
+    const loader = deferredLoader();
+    const project = createEmptyProject(1200, 800);
+    project.elements.push(createPaperElement({ path: RECT, color: '#c0392b' }));
+
+    render(
+      <FabricCanvas project={project} onReady={(c) => { canvas = c; }} textureLoader={loader} />,
+    );
+    const paper = canvas!.getObjects()[0];
+    expect(paper.fill).toBe('#c0392b');
+    expect(loader.load).not.toHaveBeenCalled();
   });
 });

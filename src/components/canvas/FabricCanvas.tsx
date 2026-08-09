@@ -7,12 +7,13 @@
  * - 不依赖 fabric `toObject()` 默认行为，schema 字段显式读写。
  */
 import { useEffect, useRef, type MutableRefObject } from 'react';
-import { Canvas, FabricImage, Path, Point, type TPointerEventInfo } from 'fabric';
+import { Canvas, FabricImage, Path, Pattern, Point, type TPointerEventInfo } from 'fabric';
 import type { PaperProject } from '../../types/project';
 import { createFabricPath } from '../../fabric/paperFactory';
 import { HIT_TOLERANCE, hitTestElement } from '../../fabric/hitTest';
 import { pointsToOpenPath, tracePointsToPaper } from '../../fabric/traceTool';
 import { getZoom, panBy, resetViewport, zoomBy } from '../../fabric/viewport';
+import { textureSourceLoader, type TextureLoader } from '../../texture/loader';
 
 /** 描摹笔迹（临时）：ink 墨色半透明，模拟手绘描线（DESIGN.md ink-line）。 */
 const TRACE_STROKE = 'rgba(90, 70, 52, 0.55)';
@@ -47,21 +48,68 @@ export interface FabricCanvasProps {
   apiRef?: MutableRefObject<FabricCanvasApi | null>;
   /** 当前工具：trace 进入自由描绘（采点 → 自动闭合 → 纸片回灌）。 */
   activeTool?: FabricTool;
+  /** 共享纹理加载器（T18 运行时与导出共用同一条管线；默认应用级单例，测试注入 fake）。 */
+  textureLoader?: TextureLoader;
 }
 
+/** 每次 renderProject 落库的「最近一次渲染快照」，供异步纹理 resolve 时校验纸片当前仍需该纹理。 */
+interface RenderSnapshot {
+  project: PaperProject;
+}
+
+const renderSnapshot = new WeakMap<Canvas, RenderSnapshot>();
+
 /** 把 project.elements 命令式推送到 fabric 画布（单向向下）。
- *  T10（T8 遗留接线）：textureId → textures 表 dataUrl → createFabricPath Pattern 填充。 */
-function renderProject(canvas: Canvas, project: PaperProject): void {
+ *  T18：带纹理纸片先以纯色占位渲染（createFabricPath 不传 source），再经共享纹理
+ *  加载器异步加载为已解码图像源后更新为 Pattern 填充；加载失败保持纯色（不抛错、
+ *  不中断画布）；resolve 时校验纸片当前仍需要该纹理（防旧覆盖）。
+ *  ADR 0001：pattern 不设 transform（缩放/旋转已在合成时烘焙进 dataURL）。 */
+function renderProject(canvas: Canvas, project: PaperProject, loader: TextureLoader): void {
   canvas.clear();
   canvas.setDimensions({ width: project.canvas.width, height: project.canvas.height });
+  renderSnapshot.set(canvas, { project });
   for (const el of project.elements) {
     const texture = el.textureId
       ? project.textures.find((t) => t.id === el.textureId)
       : undefined;
-    canvas.add(createFabricPath(el, texture?.dataUrl));
+    const path = createFabricPath(el); // 占位：无纹理源 → 纯色填充
+    canvas.add(path);
+    if (texture) {
+      void applyTextureWhenReady(canvas, el.id, texture.id, texture.dataUrl, loader);
+    }
   }
   applyBackground(canvas, project.bgPhoto);
   canvas.requestRenderAll();
+}
+
+/**
+ * 异步把已解码纹理源应用到当前纸片。
+ * resolve 时校验：画布最近一次渲染快照里该纸片仍引用同一纹理记录（同 id 且同 dataURL），
+ * 否则丢弃旧结果（快速连续编辑时旧纹理加载不覆盖新渲染）。加载失败保持纯色，不抛错。
+ */
+async function applyTextureWhenReady(
+  canvas: Canvas,
+  paperId: string,
+  textureId: string,
+  dataUrl: string,
+  loader: TextureLoader,
+): Promise<void> {
+  try {
+    const source = await loader.load(dataUrl);
+    const snapshot = renderSnapshot.get(canvas);
+    const element = snapshot?.project.elements.find((el) => el.id === paperId);
+    const texture = element?.textureId
+      ? snapshot?.project.textures.find((t) => t.id === element.textureId)
+      : undefined;
+    if (!element || element.textureId !== textureId || texture?.dataUrl !== dataUrl) return;
+    const obj = canvas.getObjects().find((o) => (o as { paperId?: string }).paperId === paperId);
+    if (!obj) return;
+    // ADR 0001 硬性契约：缩放/旋转已在合成时烘焙进位图，pattern 不设 transform
+    obj.set('fill', new Pattern({ source, repeat: 'repeat' }));
+    canvas.requestRenderAll();
+  } catch {
+    // 加载失败：保持纯色占位，不抛错、不中断画布
+  }
 }
 
 function applyBackground(canvas: Canvas, bgPhoto: PaperProject['bgPhoto']): void {
@@ -119,6 +167,7 @@ export function FabricCanvas({
   onSelectionChange,
   apiRef,
   activeTool = 'select',
+  textureLoader = textureSourceLoader,
 }: FabricCanvasProps) {
   const containerElRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<Canvas | null>(null);
@@ -129,6 +178,7 @@ export function FabricCanvas({
   const onSelectionChangeRef = useRef(onSelectionChange);
   const apiRefRef = useRef(apiRef);
   const activeToolRef = useRef(activeTool);
+  const textureLoaderRef = useRef(textureLoader);
   const pointsRef = useRef<{ x: number; y: number }[]>([]);
   const tempPathRef = useRef<Path | null>(null);
   const drawingRef = useRef(false);
@@ -139,6 +189,7 @@ export function FabricCanvas({
   onSelectionChangeRef.current = onSelectionChange;
   apiRefRef.current = apiRef;
   activeToolRef.current = activeTool;
+  textureLoaderRef.current = textureLoader;
 
   // 挂载：创建 fabric 画布并订阅事件（fabric 拥有画布内部状态）。
   // fabric v7 会把传入的 <canvas> 包进自建 wrapper，因此 React 只持有容器 div，
@@ -316,7 +367,7 @@ export function FabricCanvas({
       return;
     }
     const activePaperId = (canvas.getActiveObject() as { paperId?: string } | undefined)?.paperId;
-    renderProject(canvas, project);
+    renderProject(canvas, project, textureLoaderRef.current);
     if (activePaperId) {
       const restored = canvas
         .getObjects()

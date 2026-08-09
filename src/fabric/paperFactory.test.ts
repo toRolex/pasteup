@@ -70,8 +70,13 @@ describe('createFabricPath（seam 5）', () => {
 });
 
 describe('createFabricPath pattern 填充（seam 6，ADR 0001 硬性契约）', () => {
-  it('传入合成 dataURL 时 fill 为 fabric Pattern（repeat），且不设 patternTransform', () => {
-    const path = createFabricPath(sampleElement(), 'data:image/png;base64,iVBORw0KGgo=');
+  it('传入已解码图像源时 fill 为 fabric Pattern（repeat），且不设 patternTransform', () => {
+    const fakeSource = {
+      width: 64,
+      height: 48,
+      src: 'data:image/png;base64,iVBORw0KGgo=',
+    } as unknown as CanvasImageSource;
+    const path = createFabricPath(sampleElement(), fakeSource);
 
     expect(path.fill).toBeInstanceOf(Pattern);
     const fill = path.fill as unknown as { repeat?: string; patternTransform?: unknown };
