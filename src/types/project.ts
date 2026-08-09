@@ -150,11 +150,24 @@ export function serializeProject(project: PaperProject): string {
   return JSON.stringify(project);
 }
 
-/** 从 JSON 字符串解析项目；version 不受支持时抛错。 */
+/**
+ * 从 JSON 字符串解析项目；version 不受支持或结构损坏时抛错。
+ * 结构校验（canvas/textures/elements）保证打开损坏文件时提示错误而非在渲染层崩溃。
+ */
 export function parseProject(json: string): PaperProject {
-  const parsed = JSON.parse(json) as PaperProject;
-  if (parsed.version !== 1) {
-    throw new Error(`不支持的 project version: ${String(parsed.version)}`);
+  const parsed: unknown = JSON.parse(json);
+  if (!parsed || typeof parsed !== 'object' || (parsed as PaperProject).version !== 1) {
+    throw new Error(`不支持的 project version: ${String((parsed as PaperProject | null)?.version)}`);
   }
-  return parsed;
+  const project = parsed as PaperProject;
+  if (
+    !project.canvas ||
+    typeof project.canvas.width !== 'number' ||
+    typeof project.canvas.height !== 'number' ||
+    !Array.isArray(project.textures) ||
+    !Array.isArray(project.elements)
+  ) {
+    throw new Error('项目文件结构损坏：缺少 canvas / textures / elements 字段');
+  }
+  return project;
 }

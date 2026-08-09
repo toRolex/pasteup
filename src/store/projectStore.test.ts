@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach } from 'vitest';
-import { createPaperElement } from '../types/project';
+import { createPaperElement, createEmptyProject } from '../types/project';
 import {
   createDefaultProject,
   useProjectStore,
@@ -360,5 +360,93 @@ describe('projectStore（T11 seam）— 图层重排 reorderElements', () => {
     next = useProjectStore.getState().project.elements.map((e) => e.id);
     expect(next[0]).toBe(ids[0]);
     expect(next[1]).toBe(ids[2]);
+  });
+});
+
+describe('projectStore（T12 seam）— 自动保存状态与打开项目', () => {
+  beforeEach(() => {
+    useProjectStore.setState({
+      project: createDefaultProject(),
+      undoStack: [],
+      redoStack: [],
+      savePath: null,
+      saveStatus: 'idle',
+    });
+  });
+
+  it('初始状态：saveStatus=idle、savePath=null（新建项目尚未保存）', () => {
+    const st = useProjectStore.getState();
+    expect(st.savePath).toBeNull();
+    expect(st.saveStatus).toBe('idle');
+  });
+
+  it('setSavePath / setSaveStatus 写入保存元数据', () => {
+    useProjectStore.getState().setSavePath('/tmp/project.json');
+    expect(useProjectStore.getState().savePath).toBe('/tmp/project.json');
+
+    useProjectStore.getState().setSaveStatus('saving');
+    expect(useProjectStore.getState().saveStatus).toBe('saving');
+
+    useProjectStore.getState().setSaveStatus('saved');
+    expect(useProjectStore.getState().saveStatus).toBe('saved');
+
+    useProjectStore.getState().setSavePath(null);
+    expect(useProjectStore.getState().savePath).toBeNull();
+  });
+
+  it('createProject 重置 savePath/saveStatus（新建后下次保存重新弹位置）', () => {
+    useProjectStore.setState({
+      savePath: '/tmp/project.json',
+      saveStatus: 'saved',
+    });
+    useProjectStore.getState().createProject('landscape', 96);
+
+    const st = useProjectStore.getState();
+    expect(st.project.canvas).toEqual({ width: 1123, height: 794 });
+    expect(st.savePath).toBeNull();
+    expect(st.saveStatus).toBe('idle');
+  });
+
+  it('openProject 替换 project + 清空 undo/redo + 记录 savePath 且 saveStatus=saved', () => {
+    // 先制造撤销/重做历史（两次编辑 + 一次撤销 → undo/redo 栈均非空）
+    useProjectStore.getState().addPaper('M 0 0 L 1 0 L 0 1 Z');
+    useProjectStore.getState().addPaper('M 2 2 L 3 2 L 2 3 Z');
+    useProjectStore.getState().undo();
+    expect(useProjectStore.getState().undoStack.length).toBeGreaterThan(0);
+    expect(useProjectStore.getState().redoStack.length).toBeGreaterThan(0);
+
+    const opened = createEmptyProject(800, 600);
+    opened.elements.push(
+      createPaperElement({
+        id: 'restored-paper',
+        path: 'M 0 0 L 50 0 L 25 40 Z',
+        color: '#7a8b5c',
+        seed: 424242,
+        transform: { x: 30, y: 40, rotation: 45, scaleX: 1.5, scaleY: 1 },
+      }),
+    );
+    useProjectStore.getState().openProject(opened, '/opened/project.json');
+
+    const st = useProjectStore.getState();
+    expect(st.project).toEqual(opened);
+    expect(st.project.elements[0].id).toBe('restored-paper');
+    expect(st.savePath).toBe('/opened/project.json');
+    expect(st.saveStatus).toBe('saved');
+    expect(st.undoStack).toEqual([]);
+    expect(st.redoStack).toEqual([]);
+  });
+
+  it('openProject 后 undo/redo no-op（打开 = 新历史起点，不回退到上个项目）', () => {
+    const opened = createEmptyProject(400, 400);
+    opened.elements.push(createPaperElement({ path: 'M 0 0 Z', color: '#000', seed: 1 }));
+    useProjectStore.getState().openProject(opened, '/x.json');
+
+    const st = useProjectStore.getState();
+    st.undo();
+    st.redo();
+
+    expect(useProjectStore.getState().project).toEqual(opened);
+    expect(useProjectStore.getState().undoStack).toEqual([]);
+    expect(useProjectStore.getState().redoStack).toEqual([]);
   });
 });
