@@ -29,6 +29,9 @@ export function LayerPanel({ elements, selectedId, onSelect, onReorder }: LayerP
   if (elements.length === 0) {
     return (
       <div className="layer-panel" data-testid="layer-panel">
+        <span className="torn-paper layer-tab" data-testid="layer-tab" aria-hidden="true">
+          目录
+        </span>
         <h2 className="page-heading">图层</h2>
         <p className="layer-empty" data-testid="layer-panel-empty">
           还没有图层，描一张试试
@@ -42,6 +45,9 @@ export function LayerPanel({ elements, selectedId, onSelect, onReorder }: LayerP
 
   return (
     <div className="layer-panel" data-testid="layer-panel">
+      <span className="torn-paper layer-tab" data-testid="layer-tab" aria-hidden="true">
+        目录
+      </span>
       <h2 className="page-heading">图层</h2>
       <ul className="layer-list">
         {display.map(({ el, originalIndex }) => {

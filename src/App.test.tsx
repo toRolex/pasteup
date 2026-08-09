@@ -43,6 +43,29 @@ vi.mock('./io/projectFile', () => ({
 
 const normalize = (s: string) => s.replace(/\s+/g, '');
 
+type MatchMediaMock = {
+  matches: boolean;
+  media: string;
+  addEventListener: ReturnType<typeof vi.fn>;
+  removeEventListener: ReturnType<typeof vi.fn>;
+  addListener: ReturnType<typeof vi.fn>;
+  removeListener: ReturnType<typeof vi.fn>;
+  dispatchEvent: ReturnType<typeof vi.fn>;
+};
+
+function mockMatchMedia(matches: boolean): void {
+  const mql: MatchMediaMock = {
+    matches,
+    media: '(prefers-reduced-motion: reduce)',
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  };
+  window.matchMedia = vi.fn().mockReturnValue(mql);
+}
+
 describe('App 集成（seam S3）— 三栏骨架 + store 驱动的画布', () => {
   beforeEach(() => {
     useProjectStore.setState({ project: createDefaultProject(), undoStack: [], redoStack: [] });
@@ -379,5 +402,111 @@ describe('App 自动保存 + 打开项目（T12）— 顶栏按钮 + 保存状�
     await waitFor(() => expect(screen.getByTestId('open-error')).toHaveTextContent(/项目文件损坏/));
     expect(useProjectStore.getState().project).toEqual(createDefaultProject());
     expect(useProjectStore.getState().savePath).toBeNull();
+  });
+});
+
+describe('App 导出盖朱红图章（T16 seam 4）— 点导出盖 Pasteup 图章', () => {
+  const clickSpy = () => vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+
+  beforeEach(() => {
+    mockMatchMedia(false);
+    vi.clearAllMocks();
+    useProjectStore.setState({ project: createDefaultProject(), undoStack: [], redoStack: [] });
+  });
+
+  afterEach(() => {
+    // 只复原 matchMedia；不能用 vi.restoreAllMocks()——它会清掉文件级 T12
+    // createAutosaveController mock 的实现，导致后续 App 渲染时 controller.dispose 崩溃。
+    (window as unknown as { matchMedia?: unknown }).matchMedia = undefined;
+  });
+
+  it('初始不渲染图章', () => {
+    render(<App />);
+    expect(screen.queryByTestId('export-stamp')).toBeNull();
+  });
+
+  it('点「导出 PNG」→ 出现 Pasteup 图章（class stamp + stamped），下载仍触发', () => {
+    const createSpy = vi.spyOn(document, 'createElement');
+    const click = clickSpy();
+    render(<App />);
+
+    fireEvent.click(screen.getByTestId('export-png'));
+
+    const stamp = screen.getByTestId('export-stamp');
+    expect(stamp).toBeInTheDocument();
+    expect(stamp.className).toContain('stamp');
+    expect(stamp.className).toContain('stamped');
+    expect(stamp.textContent).toContain('Pasteup');
+
+    // 下载锚点仍触发（图章是附加反馈，不替换导出行为）
+    const exportAnchor = createSpy.mock.results
+      .map((r) => r.value as HTMLAnchorElement)
+      .find((el) => el.tagName?.toLowerCase() === 'a' && el.download !== '');
+    expect(exportAnchor).toBeDefined();
+    expect(click).toHaveBeenCalled();
+
+    createSpy.mockRestore();
+    click.mockRestore();
+  });
+
+  it('prefers-reduced-motion：根节点标降级，图章仍瞬时出现（不依赖动画）', () => {
+    mockMatchMedia(true);
+    const createSpy = vi.spyOn(document, 'createElement');
+    const click = clickSpy();
+    render(<App />);
+
+    expect(screen.getByTestId('journal')).toHaveAttribute('data-reduced-motion', 'true');
+    fireEvent.click(screen.getByTestId('export-png'));
+
+    const stamp = screen.getByTestId('export-stamp');
+    expect(stamp).toBeInTheDocument();
+    expect(stamp.className).toContain('stamped');
+    expect(stamp.textContent).toContain('Pasteup');
+
+    createSpy.mockRestore();
+    click.mockRestore();
+  });
+});
+
+describe('App 手帐拟物 class 结构（T16 seam 7）— 胶带/逐字/描线/手写圈注', () => {
+  beforeEach(() => {
+    mockMatchMedia(false);
+    useProjectStore.setState({ project: createDefaultProject(), undoStack: [], redoStack: [] });
+  });
+
+  afterEach(() => {
+    // 只复原 matchMedia；不能 vi.restoreAllMocks()（会清掉文件级 T12 autosave mock 实现）
+    (window as unknown as { matchMedia?: unknown }).matchMedia = undefined;
+  });
+
+  it('顶栏渲染骑缝胶带（.tape--topbar）', () => {
+    render(<App />);
+    expect(document.querySelector('.tape--topbar')).not.toBeNull();
+  });
+
+  it('品牌名逐字渲染（.ch span 存在）+ 手绘下划线 SVG（brand-underline + .underline-path）', () => {
+    render(<App />);
+    expect(document.querySelectorAll('.brand-name .ch').length).toBeGreaterThan(0);
+    const underline = screen.getByTestId('brand-underline');
+    expect(underline.tagName.toLowerCase()).toBe('svg');
+    expect(underline.querySelector('.underline-path')).not.toBeNull();
+  });
+
+  it('重点功能旁有手写圈注：导出旁「盖戳」+ 色板旁「点色」', () => {
+    render(<App />);
+    const exportNote = screen.getByTestId('export-circle-note');
+    expect(exportNote.className).toContain('circle-note');
+    expect(exportNote.textContent).toContain('盖戳');
+
+    const paletteNote = screen.getByTestId('palette-circle-note');
+    expect(paletteNote.className).toContain('circle-note');
+    expect(paletteNote.textContent).toContain('点色');
+  });
+
+  it('reduced-motion：品牌名直接显示（无 .ch span），仍保留下划线', () => {
+    mockMatchMedia(true);
+    render(<App />);
+    expect(document.querySelectorAll('.brand-name .ch')).toHaveLength(0);
+    expect(screen.getByTestId('brand-underline')).toBeInTheDocument();
   });
 });

@@ -5,8 +5,9 @@
  * 三栏 grid 尺寸直接来自 `tokens.layout`，经 inline style 下发——jsdom 可测，
  * 且运行时与 DESIGN.md 契约严格一致。prefers-reduced-motion 经 hook 标到根节点。
  */
-import { useEffect, useState, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { tokens } from './tokens';
+import { usePrefersReducedMotion } from './usePrefersReducedMotion';
 
 export interface JournalShellProps {
   topbar: ReactNode;
@@ -14,29 +15,6 @@ export interface JournalShellProps {
   rightPage: ReactNode;
   /** 画布区域内容（拼贴留白页）。 */
   children: ReactNode;
-}
-
-/** 跟随系统 prefers-reduced-motion 偏好（jsdom / 旧实现不可用时退化为 false）。 */
-function usePrefersReducedMotion(): boolean {
-  const [reduced, setReduced] = useState(() => {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
-    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  });
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
-    const mql = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const onChange = (event: MediaQueryListEvent) => setReduced(event.matches);
-    try {
-      mql.addEventListener('change', onChange);
-      return () => mql.removeEventListener('change', onChange);
-    } catch {
-      // jsdom 等实现不支持 addEventListener，静态读取即可
-      return undefined;
-    }
-  }, []);
-
-  return reduced;
 }
 
 export function JournalShell({ topbar, leftPage, rightPage, children }: JournalShellProps) {

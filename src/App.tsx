@@ -10,6 +10,8 @@ import { LayerPanel } from './components/panels/LayerPanel';
 import { PalettePanel } from './components/panels/PalettePanel';
 import { downloadPNG, exportCanvasToPNG } from './export/png';
 import { PropertyPanel } from './components/panels/PropertyPanel';
+import { CharReveal } from './components/brand/CharReveal';
+import { CircleNote } from './components/brand/CircleNote';
 import { useScreenPicker } from './picker/useScreenPicker';
 import { JournalShell } from './styles/journalLayout';
 import { useProjectStore, type SaveStatus } from './store/projectStore';
@@ -46,6 +48,8 @@ export default function App() {
   const [tool, setTool] = useState<FabricTool>('select');
   // T10/T11 选中联动：fabric 选中 → onSelectionChange 单向上报当前纸片 id → 图层面板 + 属性面板。
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // T16 导出图章：点导出盖朱红「Pasteup」图章（CSS 动效，reduced-motion 瞬时）。
+  const [stamped, setStamped] = useState(false);
 
   // T12 无感自动保存：订阅 store 项目变化 → 防抖写盘（首次保存弹位置选择）。
   // 控制器与写盘逻辑在 io/autosave.ts（纯逻辑、依赖注入），这里只做接线。
@@ -89,11 +93,13 @@ export default function App() {
     if (!canvas) return;
     const { dataUrl, width, height } = exportCanvasToPNG(canvas, project);
     downloadPNG(dataUrl, `pasteup-export-${width}x${height}.png`);
+    setStamped(true);
   }
 
   const handleExportSvg = async () => {
     const svg = await exportProjectToSVG(project);
     saveSvgFile(svg, 'pasteup.svg');
+    setStamped(true);
   };
 
   // T12 手动「保存」：立即触发自动保存写盘（无视防抖；首次保存仍弹位置选择）。
@@ -121,7 +127,25 @@ export default function App() {
       <JournalShell
         topbar={
           <div className="brand">
-            <span className="brand-name">pasteup · 手帐剪纸拼贴</span>
+            <span className="brand-title">
+              <CharReveal className="brand-name" text="pasteup · 手帐剪纸拼贴" />
+              <svg
+                className="brand-underline"
+                data-testid="brand-underline"
+                viewBox="0 0 220 10"
+                preserveAspectRatio="none"
+                aria-hidden="true"
+              >
+                <path
+                  className="underline-path"
+                  d="M 8 7 Q 70 2 130 6 T 214 5"
+                  fill="none"
+                  stroke="var(--tape)"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </span>
             <button
               className="tool-btn"
               data-testid="new-project"
@@ -267,6 +291,7 @@ export default function App() {
             >
               导出 PNG
             </button>
+            <CircleNote label="盖戳" testId="export-circle-note" className="circle-note--export" />
             <span className="tape tape--topbar" aria-hidden="true" />
           </div>
         }
@@ -282,9 +307,14 @@ export default function App() {
         }
         rightPage={
           <div className="page-scaffold">
-            <PalettePanel />
+            <CircleNote label="点色" testId="palette-circle-note" className="circle-note--palette" />
+            <PalettePanel selectedId={selectedId} />
             <PropertyPanel selectedId={selectedId} />
-            <span className="stamp">已装订</span>
+            {stamped && (
+              <span className="stamp stamp--export stamped" data-testid="export-stamp" aria-label="已导出 Pasteup">
+                Pasteup
+              </span>
+            )}
           </div>
         }
       >
