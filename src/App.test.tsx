@@ -203,3 +203,55 @@ describe('App 集成（S5）— 顶栏「导出 SVG」按钮触发导出 + 下�
     );
   });
 });
+
+describe('App 图层面板（T11）— 左栏图层列表 + 双向联动 + z 序重排', () => {
+  beforeEach(() => {
+    useProjectStore.setState({
+      project: createDefaultProject(),
+      undoStack: [],
+      redoStack: [],
+    });
+  });
+
+  it('左栏渲染 LayerPanel，elements 为空时显示空态', () => {
+    render(<App />);
+    expect(screen.getByTestId('layer-panel')).toBeInTheDocument();
+    expect(screen.getByTestId('layer-panel-empty')).toBeInTheDocument();
+  });
+
+  it('elements 非空时每项渲染色块 + 名称', () => {
+    useProjectStore.getState().addPaper('M 0 0 L 1 0 L 0 1 Z');
+    useProjectStore.getState().addPaper('M 1 1 L 2 1 L 1 2 Z');
+    useProjectStore.getState().addPaper('M 2 2 L 3 2 L 2 3 Z');
+    render(<App />);
+    const items = screen.getAllByTestId(/^layer-item-/);
+    expect(items).toHaveLength(3);
+  });
+
+  it('集成：点 LayerPanel "上移" → elements 数组移动', () => {
+    useProjectStore.getState().addPaper('M 0 0 L 1 0 L 0 1 Z');
+    useProjectStore.getState().addPaper('M 1 1 L 2 1 L 1 2 Z');
+    useProjectStore.getState().addPaper('M 2 2 L 3 2 L 2 3 Z');
+    const ids = useProjectStore.getState().project.elements.map((e) => e.id);
+    render(<App />);
+
+    fireEvent.click(screen.getByTestId(`layer-up-${ids[1]!}`));
+    const next = useProjectStore.getState().project.elements.map((e) => e.id);
+    // paper-1 从 index 1 上移到 index 2
+    expect(next).toEqual([ids[0], ids[2], ids[1]]);
+  });
+
+  it('集成：点 LayerPanel "置顶" 可撤销（undo 恢复原序）', () => {
+    useProjectStore.getState().addPaper('M 0 0 L 1 0 L 0 1 Z');
+    useProjectStore.getState().addPaper('M 1 1 L 2 1 L 1 2 Z');
+    useProjectStore.getState().addPaper('M 2 2 L 3 2 L 2 3 Z');
+    const ids = useProjectStore.getState().project.elements.map((e) => e.id);
+    render(<App />);
+
+    fireEvent.click(screen.getByTestId(`layer-top-${ids[0]!}`));
+    expect(useProjectStore.getState().project.elements[2]!.id).toBe(ids[0]);
+
+    fireEvent.click(screen.getByTestId('undo'));
+    expect(useProjectStore.getState().project.elements.map((e) => e.id)).toEqual(ids);
+  });
+});

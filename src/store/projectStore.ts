@@ -14,6 +14,7 @@ import {
   DEFAULT_PAPER_COLOR,
   type PaperProject,
 } from '../types/project';
+import { moveDown, moveToBottom, moveToTop, moveUp } from './layerOps';
 import {
   createCanvasSize,
   DEFAULT_CANVAS_ORIENTATION,
@@ -45,6 +46,8 @@ export interface ProjectStore {
   toggleBackgroundPhoto: () => void;
   /** 追加一个描摹闭合的纸片到 elements 末尾（数组序即 z 序，后画在上层；走撤销历史）。 */
   addPaper: (path: string, color?: string) => void;
+  /** 重排纸片 z 序（数组序即 z 序；走撤销历史；边界 no-op 自动不入栈）。 */
+  reorderElements: (id: string, op: 'up' | 'down' | 'top' | 'bottom') => void;
 }
 
 /** 按朝向 + 分辨率创建 A4 空项目。 */
@@ -79,12 +82,22 @@ function snapshotProject(project: PaperProject): PaperProject {
 /**
  * 统一编辑提交：push 编辑前快照到 undoStack、清空 redoStack（栈顶变更）、替换 project。
  * 传同一对象引用视为 no-op（避免回灌空提交）。
+ * elements 数组引用未变 → 也视为 no-op（T11 layerOps 边界 no-op：用户操作已到达目标位置，
+ * 例如已在末尾再调 moveToTop → 不应入撤销栈）。
  */
 function commitEdit(
   state: ProjectStore,
   next: PaperProject,
 ): Partial<ProjectStore> {
   if (state.project === next) return {};
+  if (
+    state.project.elements === next.elements &&
+    state.project.canvas === next.canvas &&
+    state.project.bgPhoto === next.bgPhoto &&
+    state.project.textures === next.textures
+  ) {
+    return {};
+  }
   return {
     project: next,
     undoStack: [...state.undoStack, snapshotProject(state.project)],
@@ -140,4 +153,18 @@ export const useProjectStore = create<ProjectStore>()((set) => ({
         elements: [...state.project.elements, createPaperElement({ path, color })],
       }),
     ),
+  reorderElements: (id, op) =>
+    set((state) => {
+      const compute =
+        op === 'up'
+          ? moveUp
+          : op === 'down'
+            ? moveDown
+            : op === 'top'
+              ? moveToTop
+              : moveToBottom;
+      const nextElements = compute(state.project.elements, id);
+      // layerOps 边界 no-op 返回同引用 → commitEdit 自动识别 no-op 不入栈
+      return commitEdit(state, { ...state.project, elements: nextElements });
+    }),
 }));
