@@ -24,3 +24,9 @@ tauri-plugin-fs = "2"
 block2 = "0.6"
 objc2-app-kit = { version = "0.3", features = ["NSColorSampler", "NSColor", "NSColorSpace", "block2"] }
 objc2-core-foundation = "0.3"
+
+# Windows 覆盖层取色：全屏截屏（T17）。仅 Windows 编译；macOS 侧只做依赖解析（Cargo.lock），不编译。
+[target.'cfg(target_os = "windows")'.dependencies]
+base64 = "0.22"
+screenshots = "0.8"
+serde = { version = "1", features = ["derive"] }

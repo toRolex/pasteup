@@ -11,7 +11,7 @@ import { DEFAULT_TOOL, useToolStore } from './store/toolStore';
 
 const pickScreenColorMock = vi.hoisted(() => vi.fn());
 vi.mock('./picker/pickScreenColor', () => ({
-  pickScreenColor: pickScreenColorMock,
+  pickScreenColorPlatformAware: pickScreenColorMock,
 }));
 
 describe('App 集成（S6）— 屏幕取色 + MRU 色板', () => {

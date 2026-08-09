@@ -11,7 +11,7 @@
 import { useCallback, useEffect } from 'react';
 import { useEditorStore } from '../store/editorStore';
 import { useToolStore } from '../store/toolStore';
-import { pickScreenColor } from './pickScreenColor';
+import { pickScreenColorPlatformAware } from './pickScreenColor';
 
 /** 正式取色快捷键（吸管惯例，Photoshop/Illustrator 用 I）。 */
 export const PICK_COLOR_SHORTCUT = 'i';
@@ -35,7 +35,7 @@ async function runPick(opts?: { temporary?: boolean }): Promise<void> {
   const toolStore = useToolStore.getState();
   if (toolStore.tool === 'picker') return; // 已在取色中，防重复触发
   toolStore.enterPickColor(opts);
-  const hex = await pickScreenColor();
+  const hex = await pickScreenColorPlatformAware();
   const state = useToolStore.getState();
   if (state.tool !== 'picker') return; // 取色期间已退出，丢弃结果
   if (hex) useEditorStore.getState().applyPickedColor(hex);

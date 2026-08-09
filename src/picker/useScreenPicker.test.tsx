@@ -10,7 +10,7 @@ import { PICK_COLOR_MODIFIER, PICK_COLOR_SHORTCUT, useScreenPicker } from './use
 
 const pickScreenColorMock = vi.hoisted(() => vi.fn());
 vi.mock('./pickScreenColor', () => ({
-  pickScreenColor: pickScreenColorMock,
+  pickScreenColorPlatformAware: pickScreenColorMock,
 }));
 
 function Harness() {

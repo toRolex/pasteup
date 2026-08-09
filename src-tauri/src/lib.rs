@@ -4,7 +4,17 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
-        .invoke_handler(tauri::generate_handler![pick_color])
+        // T17：Windows 额外注册 `capture_screen`（覆盖层取色）；macOS 不注册，避免多余 command 泄漏。
+        .invoke_handler({
+            #[cfg(target_os = "windows")]
+            {
+                tauri::generate_handler![pick_color, win_capture::capture_screen]
+            }
+            #[cfg(not(target_os = "windows"))]
+            {
+                tauri::generate_handler![pick_color]
+            }
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
@@ -95,13 +105,62 @@ mod platform {
     }
 }
 
-/// Windows：自制全屏覆盖层取色（Tauri 截屏 + 放大镜 + 中心像素）在 T17 双平台打包切片实现。
+/// Windows：前端覆盖层取色（T17）——`pick_color` 直接调用不再走通（前端改走
+/// `capture_screen` + 覆盖层），此处保留 Err 桩作为兜底，避免裸调用抛 command 不存在。
 #[cfg(target_os = "windows")]
 mod platform {
     use tauri::AppHandle;
 
     pub async fn pick_color(_app: AppHandle) -> Result<Option<String>, String> {
-        Err("Windows 覆盖层取色将在 T17（双平台打包切片）实现".into())
+        Err("Windows 取色请走 capture_screen + 前端覆盖层（T17）".into())
+    }
+}
+
+/// Windows 覆盖层取色第一步（T17）：Rust 侧全屏截屏，返回 PNG dataURL + 尺寸。
+///
+/// 前端 `capture_screen` command（见 src/picker/winOverlay.ts）展示全屏覆盖层 + 放大镜，
+/// 从中心像素取色。仅 Windows 编译；macOS `cargo check` 不编译本模块（cfg 门控），
+/// 只做 Cargo.lock 依赖解析级校验。
+#[cfg(target_os = "windows")]
+mod win_capture {
+    use base64::Engine;
+    use serde::Serialize;
+
+    #[derive(Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct ScreenShot {
+        pub data_url: String,
+        pub width: u32,
+        pub height: u32,
+    }
+
+    /// 截取首个屏幕，编码为 PNG dataURL。
+    #[tauri::command]
+    pub async fn capture_screen() -> Result<ScreenShot, String> {
+        let screens = screenshots::Screen::all().map_err(|e| e.to_string())?;
+        let screen = screens
+            .into_iter()
+            .next()
+            .ok_or_else(|| "未找到可用屏幕".to_string())?;
+        let image = screen.capture().map_err(|e| e.to_string())?;
+        let width = image.width();
+        let height = image.height();
+        let mut png: Vec<u8> = Vec::new();
+        screenshots::image::DynamicImage::ImageRgba8(image)
+            .write_to(
+                &mut std::io::Cursor::new(&mut png),
+                screenshots::image::ImageOutputFormat::Png,
+            )
+            .map_err(|e| e.to_string())?;
+        let data_url = format!(
+            "data:image/png;base64,{}",
+            base64::engine::general_purpose::STANDARD.encode(&png)
+        );
+        Ok(ScreenShot {
+            data_url,
+            width,
+            height,
+        })
     }
 }
 
