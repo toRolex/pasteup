@@ -278,3 +278,87 @@ describe('projectStore（T9 seam U1–U6）— 撤销/重做栈', () => {
     expect(useProjectStore.getState().project.canvas).toEqual({ width: 1123, height: 794 });
   });
 });
+
+describe('projectStore（T11 seam）— 图层重排 reorderElements', () => {
+  beforeEach(() => {
+    useProjectStore.setState({
+      project: createDefaultProject(),
+      undoStack: [],
+      redoStack: [],
+    });
+  });
+
+  it('reorderElements 走 commitProject：moveToTop 后 elements 数组末位置为该元素', () => {
+    useProjectStore.getState().addPaper('M 0 0 L 1 0 L 0 1 Z');
+    useProjectStore.getState().addPaper('M 1 1 L 2 1 L 1 2 Z');
+    useProjectStore.getState().addPaper('M 2 2 L 3 2 L 2 3 Z');
+    const ids = useProjectStore.getState().project.elements.map((e) => e.id);
+    useProjectStore.getState().reorderElements(ids[0]!, 'top');
+    const next = useProjectStore.getState().project.elements.map((e) => e.id);
+    expect(next[next.length - 1]).toBe(ids[0]);
+    expect(next[0]).toBe(ids[1]);
+    expect(next[1]).toBe(ids[2]);
+  });
+
+  it('reorderElements 走 commitProject：undo 恢复原序 / redo 恢复新序', () => {
+    useProjectStore.getState().addPaper('M 0 0 L 1 0 L 0 1 Z');
+    useProjectStore.getState().addPaper('M 1 1 L 2 1 L 1 2 Z');
+    useProjectStore.getState().addPaper('M 2 2 L 3 2 L 2 3 Z');
+    const beforeIds = useProjectStore.getState().project.elements.map((e) => e.id);
+    useProjectStore.getState().reorderElements(beforeIds[0]!, 'top');
+
+    useProjectStore.getState().undo();
+    expect(useProjectStore.getState().project.elements.map((e) => e.id)).toEqual(beforeIds);
+
+    useProjectStore.getState().redo();
+    const afterIds = useProjectStore.getState().project.elements.map((e) => e.id);
+    expect(afterIds[afterIds.length - 1]).toBe(beforeIds[0]);
+  });
+
+  it('reorderElements 栈顶变更后清空 redoStack', () => {
+    useProjectStore.getState().addPaper('M 0 0 L 1 0 L 0 1 Z');
+    useProjectStore.getState().addPaper('M 1 1 L 2 1 L 1 2 Z');
+    useProjectStore.getState().addPaper('M 2 2 L 3 2 L 2 3 Z');
+    const ids = useProjectStore.getState().project.elements.map((e) => e.id);
+    // 制造可重做历史：reorderElements → undo
+    useProjectStore.getState().reorderElements(ids[0]!, 'top');
+    useProjectStore.getState().undo();
+    expect(useProjectStore.getState().redoStack).toHaveLength(1);
+
+    // 新重排操作应清空 redoStack
+    const idsNow = useProjectStore.getState().project.elements.map((e) => e.id);
+    useProjectStore.getState().reorderElements(idsNow[1]!, 'up');
+    expect(useProjectStore.getState().redoStack).toEqual([]);
+  });
+
+  it('边界 no-op（已在最顶层 moveToTop）不入撤销栈，commitEdit 视为 no-op', () => {
+    useProjectStore.getState().addPaper('M 0 0 L 1 0 L 0 1 Z');
+    useProjectStore.getState().addPaper('M 1 1 L 2 1 L 1 2 Z');
+    useProjectStore.getState().undo(); // 清空 paper-2
+    useProjectStore.getState().undo(); // 清空 paper-1，回到空
+
+    useProjectStore.getState().addPaper('M 0 0 L 1 0 L 0 1 Z');
+    useProjectStore.getState().addPaper('M 1 1 L 2 1 L 1 2 Z');
+    const topId = useProjectStore.getState().project.elements[1]!.id;
+
+    const undoLenBefore = useProjectStore.getState().undoStack.length;
+    useProjectStore.getState().reorderElements(topId, 'top'); // 已在末尾 → no-op
+    expect(useProjectStore.getState().undoStack.length).toBe(undoLenBefore);
+  });
+
+  it('reorderElements 接受 up/down/top/bottom 四种操作', () => {
+    useProjectStore.getState().addPaper('M 0 0 L 1 0 L 0 1 Z');
+    useProjectStore.getState().addPaper('M 1 1 L 2 1 L 1 2 Z');
+    useProjectStore.getState().addPaper('M 2 2 L 3 2 L 2 3 Z');
+    const ids = useProjectStore.getState().project.elements.map((e) => e.id);
+
+    useProjectStore.getState().reorderElements(ids[2]!, 'bottom');
+    let next = useProjectStore.getState().project.elements.map((e) => e.id);
+    expect(next[0]).toBe(ids[2]);
+
+    useProjectStore.getState().reorderElements(ids[2]!, 'up');
+    next = useProjectStore.getState().project.elements.map((e) => e.id);
+    expect(next[0]).toBe(ids[0]);
+    expect(next[1]).toBe(ids[2]);
+  });
+});

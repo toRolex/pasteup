@@ -6,6 +6,7 @@ import {
   type FabricTool,
 } from './components/canvas/FabricCanvas';
 import { NewProjectDialog } from './components/dialogs/NewProjectDialog';
+import { LayerPanel } from './components/panels/LayerPanel';
 import { PalettePanel } from './components/panels/PalettePanel';
 import { downloadPNG, exportCanvasToPNG } from './export/png';
 import { PropertyPanel } from './components/panels/PropertyPanel';
@@ -21,13 +22,15 @@ export default function App() {
   const redo = useProjectStore((s) => s.redo);
   const setBackgroundPhoto = useProjectStore((s) => s.setBackgroundPhoto);
   const toggleBackgroundPhoto = useProjectStore((s) => s.toggleBackgroundPhoto);
+  const reorderElements = useProjectStore((s) => s.reorderElements);
+  const elements = project.elements;
   const bgPhoto = project.bgPhoto;
   const apiRef = useRef<FabricCanvasApi | null>(null);
   const canvasRef = useRef<Canvas | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const { activate: activatePicker } = useScreenPicker();
   const [tool, setTool] = useState<FabricTool>('select');
-  // T10 选中联动：fabric 选中 → onSelectionChange 单向上报当前纸片 id → 属性面板显示。
+  // T10/T11 选中联动：fabric 选中 → onSelectionChange 单向上报当前纸片 id → 图层面板 + 属性面板。
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   // 撤销/重做快捷键：Cmd/Ctrl+Z 撤销，Shift+Cmd/Ctrl+Z 重做。
@@ -187,10 +190,12 @@ export default function App() {
         }
         leftPage={
           <div className="page-scaffold">
-            <h2 className="page-heading">目录</h2>
-            <div className="sticky-note">
-              <p className="note-text">左页待承载：手绘目录 / 工具 / 图层</p>
-            </div>
+            <LayerPanel
+              elements={elements}
+              selectedId={selectedId}
+              onSelect={(id) => apiRef.current?.setActiveObject(id)}
+              onReorder={reorderElements}
+            />
           </div>
         }
         rightPage={

@@ -21,7 +21,7 @@ const TRACE_STROKE_WIDTH = 3;
 /** 画布当前工具：select 默认选择/移动；trace 自由描绘。 */
 export type FabricTool = 'select' | 'trace';
 
-/** React→fabric 命令式导航句柄（只承载视口操作，不承载元素读写）。 */
+/** React→fabric 命令式导航句柄（只承载视口操作与命令式选中，不承载元素读写）。 */
 export interface FabricCanvasApi {
   /** 按倍率缩放视口，返回新缩放值。 */
   zoomBy(factor: number): number;
@@ -31,6 +31,8 @@ export interface FabricCanvasApi {
   resetViewport(): void;
   /** 当前视口缩放。 */
   getZoom(): number;
+  /** 命令式选中指定 paperId 的纸片（未找到 no-op）。T11 图层面板点击条目用。 */
+  setActiveObject(paperId: string): void;
 }
 
 export interface FabricCanvasProps {
@@ -249,7 +251,7 @@ export function FabricCanvas({
     canvas.on('mouse:move', handleTraceMove);
     canvas.on('mouse:up', handleTraceUp);
 
-    // 导航句柄：仅承载视口操作（单向向下），fabric 事件仍只经 onProjectChange 回灌。
+    // 导航句柄：仅承载视口操作与命令式选中（单向向下），fabric 事件仍只经 onProjectChange 回灌。
     const targetApiRef = apiRefRef.current;
     if (targetApiRef) {
       targetApiRef.current = {
@@ -257,6 +259,14 @@ export function FabricCanvas({
         panBy: (dx, dy) => panBy(canvas, dx, dy),
         resetViewport: () => resetViewport(canvas),
         getZoom: () => getZoom(canvas),
+        setActiveObject: (paperId) => {
+          const target = canvas
+            .getObjects()
+            .find((o) => (o as { paperId?: string }).paperId === paperId);
+          if (!target) return;
+          canvas.setActiveObject(target);
+          canvas.requestRenderAll();
+        },
       };
     }
 
