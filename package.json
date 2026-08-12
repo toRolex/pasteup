@@ -2,6 +2,7 @@
   "name": "pasteup",
   "private": true,
   "version": "0.1.0",
+  "packageManager": "pnpm@11.21.0",
   "description": "手帐剪纸拼贴绘图 app：照片描摹 → 纸片元素 → 拼贴排版 → 导出 PNG/SVG",
   "type": "module",
   "scripts": {
