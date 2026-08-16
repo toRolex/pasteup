@@ -6,7 +6,8 @@
  * 本 store 只存 hex 归一化值（`#rrggbb`），其他色彩模型留待后续。
  */
 import { create } from 'zustand';
-import { addRecentColor, normalizeHex } from './recentColors';
+import { addRecentColor } from './recentColors';
+import { normalizeHex } from '../utils/color';
 
 /** 默认当前选中色（未取色 / 未选色前的兜底）。 */
 export const DEFAULT_CURRENT_COLOR = '#000000';

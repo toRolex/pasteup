@@ -1,14 +1,17 @@
 /**
- * T10 属性面板纯逻辑（seam 1/2）。
+ * T10 属性面板纯逻辑（seam 1/2）+#48 拆分。
  *
- * 不可变更新：每个变更返回新 project（引用不同才算变更；无实质变更返回原引用，
- * 避免污染撤销栈）。纹理相关属性变更经注入式 tintCache 触发重合成——
- * 缓存 key `texId:color:scale:rotate`，任一维变化 → 新 key → 新 dataURL。
+ * 不可变更新：每个变更返回新 project（引用不同才算变更；无实质变更返回原引用，避免污染撤销栈）。
+ * #48：纹理编辑拆纯 plan / 纯 apply，合成（resolve）上移到 projectStore action 编排——
+ * - `planTextureProps` 纯 plan：判 no-op / 算新建或更新变体 / 产 TintedTextureRequest（不触发合成）。
+ * - `applyTexturePlan` 纯 apply：resolve 结果（dataUrl）写回 record + prune 孤儿纹理。
+ * 两道防线：no-op 引用相等（plan 判 noop → action 不入撤销栈）；request 生命周期
+ * （plan 产出的 request 原样传 resolve 并写回，重建即 key 漂移缓存永 miss）。
  * 缩放/旋转取值受限：0.5–2（50%–200%）；0/90/180/270。
  */
 import type { PaperElement, PaperProject, PaperTexture } from '../../types/project';
 import { createPaperTexture } from '../../types/project';
-import { tintTextureCache, type TintedTextureRequest } from '../../texture/cache';
+import type { TintedTextureRequest } from '../../texture/supply';
 import {
   MAX_TEXTURE_SCALE,
   MIN_TEXTURE_SCALE,
@@ -50,11 +53,6 @@ export function isTextureRotation(value: number): value is TextureRotation {
   return (TEXTURE_ROTATIONS as readonly number[]).includes(value);
 }
 
-/** 重合成所需的最小缓存接口（注入式；默认 tintTextureCache）。 */
-export interface TintGetter {
-  get(request: TintedTextureRequest): string;
-}
-
 /** 纹理相关属性变更 patch（任一维可选，未传保持现有）。 */
 export interface TexturePropertyPatch {
   /** 纹理风格切换（6 选 1）；不传保持现有（可能无纹理）。 */
@@ -66,6 +64,17 @@ export interface TexturePropertyPatch {
   /** 纹理旋转（0/90/180/270）。 */
   rotate?: TextureRotation;
 }
+
+/**
+ * 纹理属性变更计划（纯 plan 产物，discriminated union）：
+ * - `noop`：无实质变更（撤销栈防线——action 据此不入栈）。
+ * - `color`：无纹理纸片纯色变更（不产 request，无需 resolve）。
+ * - `texture`：纹理变体变更（新建或更新）；request 原样传 resolve 并写回 record。
+ */
+export type TexturePropsPlan =
+  | { kind: 'noop' }
+  | { kind: 'color'; color: string }
+  | { kind: 'texture'; create: boolean; request: TintedTextureRequest };
 
 /** 按元素 id 应用不可变更新；找不到元素或回调未改引用时返回原 project。 */
 export function updateElementProperty(
@@ -96,22 +105,19 @@ export function applyOpacity(
 }
 
 /**
- * 应用纹理相关属性变更（颜色/缩放/旋转/风格），触发重合成。
+ * 纯 plan：判 no-op / 算新建或更新变体 / 产 TintedTextureRequest（不触发合成）。
  *
- * - 无纹理且未指定风格：仅改 element.color（纯色填充）。
- * - 已有纹理且未指定风格：更新该记录 color/scale/rotate → 重合成（同 texId，缓存新 key）。
- * - 指定风格：同风格同参数为 no-op；否则生成新 texId 记录（同 seed）并指向它，
- *   旧记录若不再被任何纸片引用则清理（避免 textures 表孤儿堆积）。
- * - element.textureScale 与记录 scale 保持同步。
+ * - 无纹理且未指定风格：仅颜色可能变更 → color plan（同色 noop）。
+ * - 已有纹理且未指定风格：更新该记录 color/scale/rotate 变体（同 texId）→ texture plan（create=false）。
+ * - 指定风格：同风格为 noop；否则产新 texId 记录变体（同 seed）→ texture plan（create=true）。
  */
-export function applyTextureProperty(
+export function planTextureProps(
   project: PaperProject,
   elementId: string,
   patch: TexturePropertyPatch,
-  tintCache: TintGetter = tintTextureCache,
-): PaperProject {
+): TexturePropsPlan {
   const element = project.elements.find((el) => el.id === elementId);
-  if (!element) return project;
+  if (!element) return { kind: 'noop' };
   const existing = element.textureId
     ? project.textures.find((t) => t.id === element.textureId)
     : undefined;
@@ -120,38 +126,17 @@ export function applyTextureProperty(
   const scale = clampTextureScale(patch.scale ?? element.textureScale);
   const rotate = patch.rotate ?? existing?.rotate ?? 0;
 
-  let textureId = element.textureId;
-  let textures = project.textures;
-
   if (patch.style !== undefined) {
-    // 风格变更 / 首次应用纹理。已是同风格 → no-op（当前色/缩放/旋转已在该记录上）。
-    if (existing && existing.style === patch.style) {
-      return project;
-    }
-    const texId = makeTextureId();
-    const dataUrl = tintCache.get({
-      texId,
-      style: patch.style,
-      seed: element.seed,
-      color,
-      scale,
-      rotate,
-    });
-    textures = [
-      ...textures,
-      createPaperTexture({
-        id: texId,
-        style: patch.style,
-        seed: element.seed,
-        color,
-        scale,
-        rotate,
-        dataUrl,
-      }),
-    ];
-    textureId = texId;
-  } else if (existing) {
-    // 无风格变更，更新现有变体（同 texId，缓存按 color/scale/rotate 新 key 重合成）
+    // 风格变更 / 首次应用纹理。已是同风格 → noop（当前色/缩放/旋转已在该记录上）。
+    if (existing && existing.style === patch.style) return { kind: 'noop' };
+    return {
+      kind: 'texture',
+      create: true,
+      request: { texId: makeTextureId(), style: patch.style, seed: element.seed, color, scale, rotate },
+    };
+  }
+  if (existing) {
+    // 无风格变更，更新现有变体（同 texId，按 color/scale/rotate 新 key 重合成）
     if (
       existing.color === color &&
       existing.scale === scale &&
@@ -159,26 +144,53 @@ export function applyTextureProperty(
       element.color === color &&
       element.textureScale === scale
     ) {
-      return project;
+      return { kind: 'noop' };
     }
-    const dataUrl = tintCache.get({
-      texId: existing.id,
-      style: existing.style,
-      seed: existing.seed,
-      color,
-      scale,
-      rotate,
-    });
-    textures = textures.map((t) =>
-      t.id === existing.id ? { ...t, color, scale, rotate, dataUrl } : t,
+    return {
+      kind: 'texture',
+      create: false,
+      request: { texId: existing.id, style: existing.style, seed: existing.seed, color, scale, rotate },
+    };
+  }
+  // 无纹理且未指定风格：仅颜色可能变更（纯色填充）
+  if (color === element.color) return { kind: 'noop' };
+  return { kind: 'color', color };
+}
+
+/**
+ * 纯 apply：把 resolve 结果（dataUrl）写回 record + prune 孤儿纹理。
+ *
+ * - noop plan → 返回原 project 引用（撤销栈防线）。
+ * - color plan → 仅改 element.color。
+ * - texture plan → 新建（createPaperTexture）或更新（同 id 覆写）变体 record，
+ *   element.color/textureId/textureScale 同步，prune 不再被引用的旧记录。
+ * request 字段原样写回（不重建），守住缓存 key 一致性防线。
+ */
+export function applyTexturePlan(
+  project: PaperProject,
+  elementId: string,
+  plan: TexturePropsPlan,
+  dataUrl: string | null = null,
+): PaperProject {
+  if (plan.kind === 'noop') return project;
+  if (plan.kind === 'color') {
+    const color = plan.color;
+    return updateElementProperty(project, elementId, (el) =>
+      el.color === color ? el : { ...el, color },
     );
-  } else {
-    // 无纹理且未指定风格：仅颜色可能变更（纯色填充）
-    if (color === element.color) return project;
-    return updateElementProperty(project, elementId, (el) => ({ ...el, color }));
   }
 
-  const updatedElement: PaperElement = { ...element, color, textureId, textureScale: scale };
+  const element = project.elements.find((el) => el.id === elementId);
+  if (!element) return project;
+  const { texId, style, seed, color, scale, rotate } = plan.request;
+
+  const textures = plan.create
+    ? [...project.textures, createPaperTexture({ id: texId, style, seed, color, scale, rotate, dataUrl: dataUrl! })]
+    : project.textures.map((t) =>
+        t.id === texId ? { ...t, color, scale, rotate, dataUrl: dataUrl! } : t,
+      );
+
+  const updatedElement: PaperElement = { ...element, color, textureId: texId, textureScale: scale };
   const newElements = project.elements.map((el) => (el.id === elementId ? updatedElement : el));
   const finalTextures = pruneOrphanTextures(textures, newElements);
   return { ...project, textures: finalTextures, elements: newElements };

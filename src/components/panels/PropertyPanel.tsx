@@ -2,8 +2,9 @@
  * PropertyPanel（T10）——右栏属性便签：纹理选择器 + 色板 + 属性（不透明度/缩放/旋转）。
  *
  * 选中联动：selectedId 由 FabricCanvas onSelectionChange 单向上报（fabric → React）。
- * 每个属性变更 → 不可变计算新 project → commitProject（撤销可回退）→ FabricCanvas 重绘。
- * 纹理相关变更经 propertyEdit.applyTextureProperty 触发重合成（tintCache 复用）。
+ * 不透明度/清除纹理：不可变计算新 project → commitProject（撤销可回退）→ FabricCanvas 重绘。
+ * 纹理相关变更（风格/颜色/缩放/旋转）走 store action `applyTextureProps`（#48：plan → resolve →
+ * apply → commit 编排，no-op 不污染撤销栈）。
  * MRU 色区归 T15 PalettePanel，本面板只放简洁内置色板 + 同步 currentColor。
  */
 import { useState } from 'react';
@@ -15,8 +16,8 @@ import {
   PROPERTY_PALETTE,
   TEXTURE_ROTATIONS,
   applyOpacity,
-  applyTextureProperty,
   removeTexture,
+  type TexturePropertyPatch,
 } from './propertyEdit';
 
 export interface PropertyPanelProps {
@@ -27,11 +28,12 @@ export interface PropertyPanelProps {
 export function PropertyPanel({ selectedId }: PropertyPanelProps) {
   const project = useProjectStore((s) => s.project);
   const commitProject = useProjectStore((s) => s.commitProject);
+  const applyTextureProps = useProjectStore((s) => s.applyTextureProps);
   const setCurrentColor = useEditorStore((s) => s.setCurrentColor);
   /** T16 便签打勾：每次属性变更 bump tick，驱动「✓ 已更新」反馈重放动画。 */
   const [tick, setTick] = useState(0);
 
-  /** 统一提交：写撤销历史 + 触发便签打勾反馈。 */
+  /** 统一提交（不透明度/清除纹理）：写撤销历史 + 触发便签打勾反馈。 */
   const commit = (next: PaperProject) => {
     commitProject(next);
     setTick((t) => t + 1);
@@ -59,6 +61,12 @@ export function PropertyPanel({ selectedId }: PropertyPanelProps) {
   const opacityPercent = Math.round(element.opacity * 100);
   const scalePercent = Math.round(element.textureScale * 100);
   const rotate = texture?.rotate ?? 0;
+
+  /** 纹理属性编辑：走 store action（plan → resolve → apply → commit），并触发便签打勾反馈。 */
+  const commitTexture = (patch: TexturePropertyPatch) => {
+    applyTextureProps(element.id, patch);
+    setTick((t) => t + 1);
+  };
 
   return (
     <section className="property-panel" data-testid="property-panel">
@@ -88,9 +96,7 @@ export function PropertyPanel({ selectedId }: PropertyPanelProps) {
               className={`texture-btn${activeStyle === s.id ? ' texture-btn--active' : ''}`}
               data-testid={`texture-${s.id}`}
               aria-pressed={activeStyle === s.id}
-              onClick={() =>
-                commit(applyTextureProperty(project, element.id, { style: s.id }))
-              }
+              onClick={() => commitTexture({ style: s.id })}
             >
               {s.name}
             </button>
@@ -114,7 +120,7 @@ export function PropertyPanel({ selectedId }: PropertyPanelProps) {
                   aria-pressed={active}
                   onClick={() => {
                     setCurrentColor(hex);
-                    commit(applyTextureProperty(project, element.id, { color: hex }));
+                    commitTexture({ color: hex });
                   }}
                 />
               </li>
@@ -155,11 +161,7 @@ export function PropertyPanel({ selectedId }: PropertyPanelProps) {
             step={1}
             value={scalePercent}
             aria-label="纹理缩放"
-            onChange={(e) =>
-              commit(
-                applyTextureProperty(project, element.id, { scale: Number(e.target.value) / 100 }),
-              )
-            }
+            onChange={(e) => commitTexture({ scale: Number(e.target.value) / 100 })}
           />
           <span className="property-value" data-testid="scale-value">
             {scalePercent}%
@@ -177,9 +179,7 @@ export function PropertyPanel({ selectedId }: PropertyPanelProps) {
               className={`rotate-btn${rotate === deg ? ' rotate-btn--active' : ''}`}
               data-testid={`rotate-${deg}`}
               aria-pressed={rotate === deg}
-              onClick={() =>
-                commit(applyTextureProperty(project, element.id, { rotate: deg }))
-              }
+              onClick={() => commitTexture({ rotate: deg })}
             >
               {deg}°
             </button>

@@ -12,7 +12,7 @@
  * - 异步纹理补丁（applyTextureWhenReady / applyBackground）收进内部：带纹理纸片先纯色占位，
  *   经共享加载器异步解码后更新为 Pattern；resolve 时校验内部渲染快照里该纸片仍引用同一纹理
  *   （防旧覆盖）；加载失败保持纯色（不抛错、不中断画布）。
- * - loader 构造注入（TextureLoader seam：prod 单例 / test fake 两 adapter）。
+ * - loader 构造注入（textureSupply 的 load 侧窄 interface：prod 单例 / test fake 两 adapter）。
  * - 生命周期与 canvas 绑定：仅 mount 创建 / unmount dispose；dispose 只清本 module 内部状态，
  *   canvas.dispose() 仍由壳负责。
  *
@@ -21,7 +21,7 @@
 import { Canvas, FabricImage, Pattern } from 'fabric';
 import { diffProject, type PaperProject } from '../types/project';
 import { createFabricPath, findPaperObject } from './paperBridge';
-import type { TextureLoader } from '../texture/loader';
+import type { TextureLoadSide } from '../texture/supply';
 
 /** 渲染器 interface：render 同步 project 到画布；dispose 清内部状态（canvas 生命周期归壳）。 */
 export interface ProjectRenderer {
@@ -29,7 +29,7 @@ export interface ProjectRenderer {
   dispose(): void;
 }
 
-export function createProjectRenderer(canvas: Canvas, loader: TextureLoader): ProjectRenderer {
+export function createProjectRenderer(canvas: Canvas, loader: TextureLoadSide): ProjectRenderer {
   // 内部状态：最近一次渲染的 project（prev 与渲染快照合并成一份）。失效判定（diffProject 的 prev）
   // 与异步纹理 resolve 校验（防旧覆盖）都读这一份。重复 createProjectRenderer 会丢 prev（决议风险）。
   let lastRendered: PaperProject | null = null;

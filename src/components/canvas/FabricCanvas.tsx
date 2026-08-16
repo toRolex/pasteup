@@ -16,7 +16,7 @@ import { createProjectRenderer, type ProjectRenderer } from '../../fabric/projec
 import { HIT_TOLERANCE, hitTestElement } from '../../fabric/hitTest';
 import { pointsToOpenPath, tracePointsToPaper } from '../../fabric/traceTool';
 import { getZoom, panBy, resetViewport, zoomBy } from '../../fabric/viewport';
-import { textureSourceLoader, type TextureLoader } from '../../texture/loader';
+import { textureSupply, type TextureLoadSide } from '../../texture/supply';
 
 /** 描摹笔迹（临时）：ink 墨色半透明，模拟手绘描线（DESIGN.md ink-line）。 */
 const TRACE_STROKE = 'rgba(90, 70, 52, 0.55)';
@@ -51,8 +51,8 @@ export interface FabricCanvasProps {
   apiRef?: MutableRefObject<FabricCanvasApi | null>;
   /** 当前工具：trace 进入自由描绘（采点 → 自动闭合 → 纸片回灌）。 */
   activeTool?: FabricTool;
-  /** 共享纹理加载器（T18 运行时与导出共用同一条管线；默认应用级单例，测试注入 fake）。 */
-  textureLoader?: TextureLoader;
+  /** 纹理供给 load 侧（T18 运行时与导出共用同一条管线；默认应用级单例，测试注入 fake）。 */
+  textureLoader?: TextureLoadSide;
 }
 
 /** 从 fabric 画布对象显式读回 transform，回灌成新 project（单向向上，不写回原对象）。
@@ -83,7 +83,7 @@ export function FabricCanvas({
   onSelectionChange,
   apiRef,
   activeTool = 'select',
-  textureLoader = textureSourceLoader,
+  textureLoader = textureSupply,
 }: FabricCanvasProps) {
   const containerElRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<Canvas | null>(null);

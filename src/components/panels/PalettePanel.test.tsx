@@ -1,7 +1,7 @@
 /**
  * S6 / T16 — PalettePanel：右栏色卡面板（当前选中色 + 「最近使用」MRU 色区）。
  * 取色结果经 editorStore 落位；本组件只读渲染 + 点击复用（setCurrentColor）。
- * T16 seam 2：点色联动——有选中纸片时点 MRU 色同时给纸片着色（走 applyTextureProperty）。
+ * T16 seam 2：点色联动——有选中纸片时点 MRU 色同时给纸片着色（走 applyTextureProps action）。
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
@@ -10,10 +10,16 @@ import { useProjectStore } from '../../store/projectStore';
 import { createEmptyProject, createPaperElement, createPaperTexture } from '../../types/project';
 import { PalettePanel } from './PalettePanel';
 
-// applyTextureProperty 重合成依赖 tintCache；测试注入廉价 dataURL 避免真实 1024² fbm 合成。
-vi.mock('../../texture/cache', () => ({
-  tintTextureCache: { get: vi.fn(() => 'data:image/png;base64,MOCK') },
-}));
+// applyTextureProps 重合成依赖 textureSupply；构造注入廉价 compose 避免真实 1024² fbm 合成。
+vi.mock('../../texture/supply', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../texture/supply')>();
+  return {
+    ...actual,
+    textureSupply: actual.createTextureSupply({
+      compose: () => 'data:image/png;base64,MOCK',
+    }),
+  };
+});
 
 function projectWithPaper(): ReturnType<typeof createEmptyProject> {
   const project = createEmptyProject(1200, 800);
@@ -100,7 +106,7 @@ describe('PalettePanel 点色联动（T16 seam 2）— 点色给选中纸片着�
     expect(st.undoStack).toHaveLength(1); // 走 commitProject 可撤销
   });
 
-  it('有选中纸片但 MRU 色与当前元素色相同：仍记录撤销快照（applyTextureProperty 内部 no-op 语义不重复）', () => {
+  it('有选中纸片但 MRU 色与当前元素色相同：no-op 不入撤销栈（applyTextureProps 防线一）', () => {
     // 选中纸片已是 #7A8B5C，点回同色 → 无实质变更 → 不入撤销栈（避免污染历史）
     useProjectStore.setState({ project: projectWithPaper() });
     useEditorStore.setState({ recentColors: ['#7A8B5C'] });

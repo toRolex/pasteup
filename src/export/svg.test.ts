@@ -13,7 +13,7 @@ import {
   createPaperTexture,
   type PaperProject,
 } from '../types/project';
-import { createTextureLoader } from '../texture/loader';
+import { createTextureSupply } from '../texture/supply';
 import { createFabricPath } from '../fabric/paperBridge';
 import {
   buildRawSvg,
@@ -406,7 +406,7 @@ describe('exportProjectToSVG（S3）— 导出管线（注入共享 loader）', 
       }),
     );
     const load = vi.fn(async () => fakeSource as CanvasImageSource);
-    const loader = createTextureLoader({ load });
+    const loader = createTextureSupply({ load });
 
     const svg = await exportProjectToSVG(project, loader);
 
@@ -424,7 +424,7 @@ describe('exportProjectToSVG（S3）— 导出管线（注入共享 loader）', 
 
   it('空项目导出为合法 SVG 根（无 pattern/无底图）', async () => {
     const project = createEmptyProject(2480, 3508);
-    const loader = createTextureLoader({ load: async () => fakeSource as CanvasImageSource });
+    const loader = createTextureSupply({ load: async () => fakeSource as CanvasImageSource });
     const svg = await exportProjectToSVG(project, loader);
     expect(svg).toContain('<svg');
     expect(svg).toContain('width="2480"');
@@ -448,7 +448,7 @@ describe('exportProjectToSVG（S3）— 导出管线（注入共享 loader）', 
       }),
     );
     const load = vi.fn(async () => fakeSource as CanvasImageSource);
-    const loader = createTextureLoader({ load });
+    const loader = createTextureSupply({ load });
 
     await exportProjectToSVG(project, loader);
 
@@ -476,7 +476,7 @@ describe('exportProjectToSVG（S3）— 导出管线（注入共享 loader）', 
       }),
     );
     const load = vi.fn(async (href: string) => ({ ...fakeSource, src: href }) as CanvasImageSource);
-    const loader = createTextureLoader({ load });
+    const loader = createTextureSupply({ load });
 
     const svg = await exportProjectToSVG(project, loader);
 

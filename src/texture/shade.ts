@@ -7,7 +7,7 @@
  * - 缩放经双线性插值采样烘焙（放大更平滑）。
  * 数据来源与导出共用同一 dataURL（ADR 0001：pattern 不设 transform）。
  */
-import { normalizeHex } from '../store/recentColors';
+import { normalizeHex } from '../utils/color';
 
 /** 合成基准尺寸（灰度源纹理边长）。 */
 export const TEXTURE_BASE_SIZE = 1024;

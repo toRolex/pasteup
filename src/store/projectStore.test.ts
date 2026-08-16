@@ -1,9 +1,22 @@
-import { describe, expect, it, beforeEach } from 'vitest';
-import { createPaperElement, createEmptyProject } from '../types/project';
+import { describe, expect, it, beforeEach, vi } from 'vitest';
+import { createPaperElement, createPaperTexture, createEmptyProject, type PaperProject } from '../types/project';
 import {
   createDefaultProject,
   useProjectStore,
 } from './projectStore';
+
+// applyTextureProps 经 textureSupply.resolve 合成；注入按 request 编码的廉价 compose，
+// 避免真实 1024² fbm 合成，并让「request 原样传 resolve」可被断言（key 一致性）。
+vi.mock('../texture/supply', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../texture/supply')>();
+  return {
+    ...actual,
+    textureSupply: actual.createTextureSupply({
+      compose: (r: { texId: string; color: string; scale: number; rotate: number }) =>
+        `url:${r.texId}:${r.color}:${r.scale}:${r.rotate}`,
+    }),
+  };
+});
 
 describe('projectStore（seam S2）— 当前项目单一来源', () => {
   beforeEach(() => {
@@ -468,5 +481,70 @@ describe('projectStore（T12 seam）— 自动保存状态与打开项目', () =
     expect(useProjectStore.getState().project).toEqual(opened);
     expect(useProjectStore.getState().undoStack).toEqual([]);
     expect(useProjectStore.getState().redoStack).toEqual([]);
+  });
+});
+
+describe('projectStore（#48）— applyTextureProps 纹理编辑编排', () => {
+  function texturedProject(): PaperProject {
+    const project = createEmptyProject(1200, 800);
+    project.textures.push(
+      createPaperTexture({ id: 'tex-1', style: 'fold', seed: 42, color: '#7A8B5C', scale: 1, rotate: 0, dataUrl: 'data:OLD' }),
+    );
+    project.elements.push(
+      createPaperElement({ id: 'paper-1', path: 'M 0 0 L 100 0 L 100 80 L 0 80 Z', color: '#7A8B5C', textureId: 'tex-1', textureScale: 1, seed: 42 }),
+    );
+    return project;
+  }
+
+  beforeEach(() => {
+    useProjectStore.setState({ project: texturedProject(), undoStack: [], redoStack: [] });
+  });
+
+  it('编排 plan → resolve → apply → commit：record 与 element 同步更新，入撤销栈可回退', () => {
+    useProjectStore.getState().applyTextureProps('paper-1', { color: '#ff0000' });
+    const st = useProjectStore.getState();
+    expect(st.project.textures[0].color).toBe('#ff0000');
+    expect(st.project.elements[0].color).toBe('#ff0000');
+    expect(st.project.textures[0].dataUrl).toContain('#ff0000'); // resolve 产物写回 record
+    expect(st.undoStack).toHaveLength(1);
+
+    useProjectStore.getState().undo();
+    expect(useProjectStore.getState().project.textures[0].color).toBe('#7A8B5C');
+  });
+
+  it('防线 1：no-op 编辑（同色）不入撤销栈', () => {
+    const undoLen = useProjectStore.getState().undoStack.length;
+    useProjectStore.getState().applyTextureProps('paper-1', { color: '#7A8B5C' }); // 同色 no-op
+    expect(useProjectStore.getState().undoStack).toHaveLength(undoLen);
+  });
+
+  it('防线 2：request 原样传 resolve——record.dataUrl 等于用 record 自身字段重组的 key', () => {
+    useProjectStore.getState().applyTextureProps('paper-1', { scale: 2 });
+    const tex = useProjectStore.getState().project.textures[0];
+    // compose 按 request 编码 dataUrl；dataUrl 必须等于用 record 自身字段重组者（否则 key 漂移永 miss）
+    expect(tex.dataUrl).toBe(`url:${tex.id}:${tex.color}:${tex.scale}:${tex.rotate}`);
+    expect(tex.scale).toBe(2);
+  });
+
+  it('无纹理纸片纯色变更也走 action（color plan，不经 resolve）', () => {
+    const plain = createEmptyProject(1200, 800);
+    plain.elements.push(createPaperElement({ id: 'paper-1', path: 'M 0 0 Z', color: '#7A8B5C', seed: 42 }));
+    useProjectStore.setState({ project: plain, undoStack: [], redoStack: [] });
+
+    useProjectStore.getState().applyTextureProps('paper-1', { color: '#ff0000' });
+    const st = useProjectStore.getState();
+    expect(st.project.elements[0].color).toBe('#ff0000');
+    expect(st.project.textures).toEqual([]); // 不产生纹理记录
+    expect(st.undoStack).toHaveLength(1);
+  });
+
+  it('切换风格：新建变体 record，element 指向新 id，旧 record prune', () => {
+    useProjectStore.getState().applyTextureProps('paper-1', { style: 'grain' });
+    const st = useProjectStore.getState();
+    const el = st.project.elements[0];
+    expect(el.textureId).not.toBe('tex-1');
+    const tex = st.project.textures.find((t) => t.id === el.textureId);
+    expect(tex?.style).toBe('grain');
+    expect(st.project.textures).toHaveLength(1); // 旧 tex-1 prune
   });
 });

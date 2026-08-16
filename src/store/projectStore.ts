@@ -17,6 +17,12 @@ import {
 } from '../types/project';
 import { moveDown, moveToBottom, moveToTop, moveUp } from './layerOps';
 import {
+  applyTexturePlan,
+  planTextureProps,
+  type TexturePropertyPatch,
+} from '../components/panels/propertyEdit';
+import { textureSupply, type TextureResolveSide } from '../texture/supply';
+import {
   createCanvasSize,
   DEFAULT_CANVAS_ORIENTATION,
   DEFAULT_CANVAS_RESOLUTION,
@@ -59,6 +65,12 @@ export interface ProjectStore {
   addPaper: (path: string, color?: string) => void;
   /** 重排纸片 z 序（数组序即 z 序；走撤销历史；边界 no-op 自动不入栈）。 */
   reorderElements: (id: string, op: 'up' | 'down' | 'top' | 'bottom') => void;
+  /**
+   * 纹理属性编辑（#48）：编排 plan → resolve → apply → commitProject。
+   * 两道防线：plan 判 no-op → 直接返回不入撤销栈（引用相等）；plan 产出的 request 原样传
+   * resolve 并写回 record（重建即 key 漂移缓存永 miss）。resolve 侧只声明窄 interface。
+   */
+  applyTextureProps: (elementId: string, patch: TexturePropertyPatch) => void;
   /** 记录当前项目文件路径（首次保存后 / 打开项目后调用）。 */
   setSavePath: (path: string | null) => void;
   /** 记录自动保存状态（驱动 UI 指示）。 */
@@ -118,7 +130,7 @@ function commitEdit(
   };
 }
 
-export const useProjectStore = create<ProjectStore>()((set) => ({
+export const useProjectStore = create<ProjectStore>()((set, get) => ({
   project: createDefaultProject(),
   undoStack: [],
   redoStack: [],
@@ -189,6 +201,16 @@ export const useProjectStore = create<ProjectStore>()((set) => ({
       // layerOps 边界 no-op 返回同引用 → commitEdit 自动识别 no-op 不入栈
       return commitEdit(state, { ...state.project, elements: nextElements });
     }),
+  applyTextureProps: (elementId, patch) => {
+    // resolve 侧窄 interface（#48 Q1）：projectStore 只声明同步合成一侧
+    const resolver: TextureResolveSide = textureSupply;
+    const plan = planTextureProps(get().project, elementId, patch);
+    // 防线 1：no-op 引用相等 → 不入撤销栈（不 commitProject）
+    if (plan.kind === 'noop') return;
+    // 防线 2：plan 产出的 request 原样传 resolve（重建即 key 漂移缓存永 miss）
+    const dataUrl = plan.kind === 'texture' ? resolver.resolve(plan.request) : null;
+    set((state) => commitEdit(state, applyTexturePlan(state.project, elementId, plan, dataUrl)));
+  },
   setSavePath: (path) => set({ savePath: path }),
   setSaveStatus: (status) => set({ saveStatus: status }),
   openProject: (project, savePath) =>

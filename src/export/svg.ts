@@ -10,12 +10,12 @@
  * 导出时把 `<pattern>` 收进 `<defs>`，并断言无 `patternTransform`。
  *
  * 导出从 project schema 重建临时 StaticCanvas（不碰 live canvas，构造上排除底图），
- * 纹理 dataURL 加载走共享纹理加载器（`src/texture/loader.ts`，与运行时共用同一条管线，
- * 同一 dataURL 解码结果复用；jsdom 不能真实解码图片，测试注入 fake loader）。
+ * 纹理 dataURL 加载走纹理供给（`src/texture/supply.ts`，与运行时共用同一条管线，
+ * 同一 dataURL 解码结果复用；jsdom 不能真实解码图片，测试注入 fake load adapter）。
  */
 import { StaticCanvas } from 'fabric';
 import { createFabricPath } from '../fabric/paperBridge';
-import { textureSourceLoader, type TextureLoader } from '../texture/loader';
+import { textureSupply, type TextureLoadSide } from '../texture/supply';
 import type { PaperProject } from '../types/project';
 
 /**
@@ -75,13 +75,13 @@ export function buildRawSvg(
 }
 
 /**
- * 导出管线：经共享纹理加载器加载纹理源（同一 dataURL 复用）→ 从 schema 重建 → post-process。
- * @param loader 共享纹理加载器（默认应用级单例；测试注入 fake）。
+ * 导出管线：经纹理供给 load 侧加载纹理源（同一 dataURL 复用）→ 从 schema 重建 → post-process。
+ * @param loader 纹理供给 load 侧（默认应用级单例；测试注入 fake）。
  * @returns 规范化后的 SVG 字符串（pattern/filter 在 defs 内、无 patternTransform、自包含）。
  */
 export async function exportProjectToSVG(
   project: PaperProject,
-  loader: TextureLoader = textureSourceLoader,
+  loader: TextureLoadSide = textureSupply,
 ): Promise<string> {
   const sources = new Map<string, CanvasImageSource>();
   for (const texture of project.textures) {

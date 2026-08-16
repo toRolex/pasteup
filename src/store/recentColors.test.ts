@@ -1,37 +1,10 @@
 /**
- * S1 — MRU 色区纯逻辑：hex 归一化 + 去重置顶 / 上限 12（会话级，不落盘）。
+ * S1 — MRU 色区纯逻辑：去重置顶 / 上限 12（会话级，不落盘）。
  * 纯函数，jsdom 可测；UI store 层（editorStore）复用本模块。
+ * hex 归一化（normalizeHex）已迁共享 leaf `utils/color`，其测试见 color.test.ts。
  */
 import { describe, expect, it } from 'vitest';
-import { addRecentColor, MAX_RECENT_COLORS, normalizeHex } from './recentColors';
-
-describe('normalizeHex（S1）— 归一化为小写 #rrggbb', () => {
-  it('#rrggbb 任意大小写统一为小写', () => {
-    expect(normalizeHex('#AABBCC')).toBe('#aabbcc');
-    expect(normalizeHex('#aAbBcC')).toBe('#aabbcc');
-    expect(normalizeHex('#ffffff')).toBe('#ffffff');
-  });
-
-  it('#rgb 三倍展开为 #rrggbb', () => {
-    expect(normalizeHex('#abc')).toBe('#aabbcc');
-    expect(normalizeHex('#ABC')).toBe('#aabbcc');
-    expect(normalizeHex('#f00')).toBe('#ff0000');
-  });
-
-  it('无 # 前缀的 6 位 hex 补前缀', () => {
-    expect(normalizeHex('aabbcc')).toBe('#aabbcc');
-    expect(normalizeHex('FF0000')).toBe('#ff0000');
-  });
-
-  it('非法输入返回 null', () => {
-    expect(normalizeHex('')).toBeNull();
-    expect(normalizeHex('#12')).toBeNull();
-    expect(normalizeHex('#12345')).toBeNull();
-    expect(normalizeHex('#gggggg')).toBeNull();
-    expect(normalizeHex('not a color')).toBeNull();
-    expect(normalizeHex('rgb(1,2,3)')).toBeNull();
-  });
-});
+import { addRecentColor, MAX_RECENT_COLORS } from './recentColors';
 
 describe('addRecentColor（S1）— MRU 去重置顶 / 上限 12', () => {
   it('空列表追加第一项', () => {

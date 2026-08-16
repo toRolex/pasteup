@@ -15,7 +15,7 @@ import {
   createPaperTexture,
   type PaperProject,
 } from '../types/project';
-import type { TextureLoader } from '../texture/loader';
+import type { TextureLoadSide } from '../texture/supply';
 import { createProjectRenderer } from './projectRenderer';
 
 const RECT = 'M 0 0 L 100 0 L 100 80 L 0 80 Z';
@@ -44,7 +44,7 @@ function deferred<T>(): Deferred<T> {
 }
 
 /** 可控 fake 纹理加载器：按 dataUrl 返回待决 Promise，测试手动 resolve/reject。 */
-function deferredLoader(): TextureLoader & {
+function deferredLoader(): TextureLoadSide & {
   resolve: (url: string, src: CanvasImageSource) => void;
   reject: (url: string, reason?: unknown) => void;
 } {
@@ -56,8 +56,6 @@ function deferredLoader(): TextureLoader & {
   });
   return {
     load,
-    size: 0,
-    clear: vi.fn(),
     resolve(url, src) {
       pending.get(url)?.resolve(src);
     },

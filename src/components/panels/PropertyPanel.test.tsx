@@ -1,8 +1,8 @@
 /**
  * T10 PropertyPanel 属性面板（seam 3/6）：
  * - 空选中占位 / 选中显示属性值（纹理风格/色板/不透明度/缩放/旋转）
- * - 属性编辑 → commitProject（可撤销/重做）
- * - 纹理重合成（mock tintTextureCache 避免真实像素合成）
+ * - 属性编辑 → commitProject / applyTextureProps action（可撤销/重做）
+ * - 纹理重合成（mock textureSupply 注入廉价 compose 避免真实像素合成）
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
@@ -11,10 +11,16 @@ import { useProjectStore } from '../../store/projectStore';
 import { useEditorStore } from '../../store/editorStore';
 import { PropertyPanel } from './PropertyPanel';
 
-// propertyEdit 默认 tintTextureCache 走真实合成（1024² fbm）过慢；测试注入廉价 dataURL。
-vi.mock('../../texture/cache', () => ({
-  tintTextureCache: { get: vi.fn(() => 'data:image/png;base64,MOCK') },
-}));
+// applyTextureProps 默认 textureSupply 走真实合成（1024² fbm）过慢；构造注入廉价 compose。
+vi.mock('../../texture/supply', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../texture/supply')>();
+  return {
+    ...actual,
+    textureSupply: actual.createTextureSupply({
+      compose: () => 'data:image/png;base64,MOCK',
+    }),
+  };
+});
 
 function projectWithPaper(options: { texture?: boolean } = {}): ReturnType<typeof createEmptyProject> {
   const project = createEmptyProject(1200, 800);

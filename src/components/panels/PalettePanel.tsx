@@ -3,12 +3,11 @@
  *
  * 数据单向来自 editorStore（当前选中色 / MRU），点击 MRU 色块复用（setCurrentColor）。
  * 取色结果由 useScreenPicker 经 applyPickedColor 写入 editorStore，本组件只做渲染与复用。
- * T16 点色联动：有选中纸片（selectedId）时，点 MRU 色同时给纸片着色——经
- * applyTextureProperty 走重合成（element.color + texture.color 同步），并落入撤销栈。
+ * T16 点色联动：有选中纸片（selectedId）时，点 MRU 色同时给纸片着色——走 store action
+ * `applyTextureProps`（#48：element.color + texture.color 同步重合成，并落入撤销栈）。
  */
 import { useEditorStore } from '../../store/editorStore';
 import { useProjectStore } from '../../store/projectStore';
-import { applyTextureProperty } from './propertyEdit';
 
 export interface PalettePanelProps {
   /** 当前选中纸片 id（App 持有，fabric → React 单向）；null 表示未选中。 */
@@ -24,8 +23,7 @@ export function PalettePanel({ selectedId = null }: PalettePanelProps) {
   const applyColor = (hex: string) => {
     setCurrentColor(hex);
     if (selectedId) {
-      const { project, commitProject } = useProjectStore.getState();
-      commitProject(applyTextureProperty(project, selectedId, { color: hex }));
+      useProjectStore.getState().applyTextureProps(selectedId, { color: hex });
     }
   };
 

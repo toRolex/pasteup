@@ -1,25 +1,27 @@
 /**
- * T10 属性面板纯逻辑（seam 1/2）：
+ * T10 属性面板纯逻辑（seam 1/2）+#48 拆分：
  * - 缩放/旋转/不透明度 clamp 与取值受限（50%–200%；0/90/180/270）
- * - 纹理重合成触发（属性变更 → tintCache 新 key → 新 dataURL）
- * - 属性编辑不可变更新（no-op 返回原 project 引用）
+ * - planTextureProps 纯 plan：判 no-op / 算新建或更新变体 / 产 TintedTextureRequest（不触发合成）
+ * - applyTexturePlan 纯 apply：resolve 结果（dataUrl）写回 record + prune
+ * - 不可变更新：no-op 返回原 project 引用（撤销栈防线）
  */
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { createEmptyProject, createPaperElement, createPaperTexture } from '../../types/project';
 import {
   MAX_TEXTURE_SCALE,
   MIN_TEXTURE_SCALE,
 } from '../../texture/shade';
-import type { TintedTextureRequest } from '../../texture/cache';
 import {
   applyOpacity,
-  applyTextureProperty,
+  applyTexturePlan,
   clampOpacity,
   clampTextureScale,
   isTextureRotation,
+  planTextureProps,
   removeTexture,
   TEXTURE_ROTATIONS,
   updateElementProperty,
+  type TexturePropsPlan,
 } from './propertyEdit';
 
 function projectWithPaper(options: { texture?: boolean } = {}): ReturnType<typeof createEmptyProject> {
@@ -49,16 +51,6 @@ function projectWithPaper(options: { texture?: boolean } = {}): ReturnType<typeo
     );
   }
   return project;
-}
-
-/** 注入式 tintCache spy：key 编码进 dataURL，便于断言请求参数。 */
-function mockTintCache() {
-  return {
-    get: vi.fn(
-      (req: TintedTextureRequest) =>
-        `url:${req.texId}:${req.color}:${req.scale}:${req.rotate}`,
-    ),
-  };
 }
 
 describe('clamp 纯逻辑（seam 1）', () => {
@@ -112,83 +104,155 @@ describe('applyOpacity（seam 1）', () => {
   });
 });
 
-describe('applyTextureProperty 重合成触发（seam 2）', () => {
-  it('无纹理纸片改色：仅 element.color 变更，不触发重合成', () => {
+describe('planTextureProps 纯 plan（seam 2：判 no-op / 算变体 / 产 request）', () => {
+  it('找不到元素 → noop', () => {
+    const project = projectWithPaper({ texture: true });
+    expect(planTextureProps(project, 'missing', { color: '#ff0000' })).toEqual({ kind: 'noop' });
+  });
+
+  it('无纹理纸片改色 → color plan（不产 request，纯着色）', () => {
     const project = projectWithPaper();
-    const tintCache = mockTintCache();
-    const next = applyTextureProperty(project, 'paper-1', { color: '#ff0000' }, tintCache);
+    expect(planTextureProps(project, 'paper-1', { color: '#ff0000' })).toEqual({
+      kind: 'color',
+      color: '#ff0000',
+    });
+  });
+
+  it('无纹理纸片同色 → noop', () => {
+    const project = projectWithPaper();
+    expect(planTextureProps(project, 'paper-1', { color: '#7A8B5C' })).toEqual({ kind: 'noop' });
+  });
+
+  it('有纹理改色 → texture plan（更新变体 create=false，request 带新色、同 texId）', () => {
+    const project = projectWithPaper({ texture: true });
+    const plan = planTextureProps(project, 'paper-1', { color: '#ff0000' });
+    expect(plan.kind).toBe('texture');
+    if (plan.kind !== 'texture') return;
+    expect(plan.create).toBe(false);
+    expect(plan.request).toEqual({
+      texId: 'tex-1',
+      style: 'fold',
+      seed: 42,
+      color: '#ff0000',
+      scale: 1,
+      rotate: 0,
+    });
+  });
+
+  it('纹理缩放越界 clamp 到 0.5–2 落入 request', () => {
+    const project = projectWithPaper({ texture: true });
+    const high = planTextureProps(project, 'paper-1', { scale: 3 });
+    if (high.kind !== 'texture') throw new Error('应为 texture plan');
+    expect(high.request.scale).toBe(MAX_TEXTURE_SCALE);
+
+    const low = planTextureProps(project, 'paper-1', { scale: 0.1 });
+    if (low.kind !== 'texture') throw new Error('应为 texture plan');
+    expect(low.request.scale).toBe(MIN_TEXTURE_SCALE);
+  });
+
+  it('旋转纹理 → request.rotate 更新', () => {
+    const project = projectWithPaper({ texture: true });
+    const plan = planTextureProps(project, 'paper-1', { rotate: 90 });
+    if (plan.kind !== 'texture') throw new Error('应为 texture plan');
+    expect(plan.request.rotate).toBe(90);
+  });
+
+  it('切换纹理风格 → texture plan（create=true，新 texId ≠ 旧，seed 保留）', () => {
+    const project = projectWithPaper({ texture: true });
+    const plan = planTextureProps(project, 'paper-1', { style: 'grain' });
+    if (plan.kind !== 'texture') throw new Error('应为 texture plan');
+    expect(plan.create).toBe(true);
+    expect(plan.request.texId).not.toBe('tex-1');
+    expect(plan.request.style).toBe('grain');
+    expect(plan.request.seed).toBe(42);
+  });
+
+  it('无纹理首次指定风格 → texture plan（create=true）', () => {
+    const project = projectWithPaper();
+    const plan = planTextureProps(project, 'paper-1', { style: 'grain' });
+    if (plan.kind !== 'texture') throw new Error('应为 texture plan');
+    expect(plan.create).toBe(true);
+    expect(plan.request.style).toBe('grain');
+  });
+
+  it('已是同风格纹理再点该风格 → noop', () => {
+    const project = projectWithPaper({ texture: true }); // 已有 fold
+    expect(planTextureProps(project, 'paper-1', { style: 'fold' })).toEqual({ kind: 'noop' });
+  });
+
+  it('有纹理无实质变更（同色/同 scale/同 rotate）→ noop', () => {
+    const project = projectWithPaper({ texture: true });
+    expect(planTextureProps(project, 'paper-1', { color: '#7A8B5C' })).toEqual({ kind: 'noop' });
+    expect(planTextureProps(project, 'paper-1', { rotate: 0 })).toEqual({ kind: 'noop' });
+    expect(planTextureProps(project, 'paper-1', { scale: 1 })).toEqual({ kind: 'noop' });
+  });
+});
+
+describe('applyTexturePlan 纯 apply（seam 2：resolve 结果写回 record + prune）', () => {
+  it('noop plan → 返回原 project 引用（撤销栈防线）', () => {
+    const project = projectWithPaper({ texture: true });
+    expect(applyTexturePlan(project, 'paper-1', { kind: 'noop' })).toBe(project);
+  });
+
+  it('color plan → 仅改 element.color，textures 不变', () => {
+    const project = projectWithPaper();
+    const next = applyTexturePlan(project, 'paper-1', { kind: 'color', color: '#ff0000' });
     expect(next.elements[0].color).toBe('#ff0000');
     expect(next.textures).toEqual([]);
-    expect(tintCache.get).not.toHaveBeenCalled();
   });
 
-  it('有纹理纸片改色：触发重合成，texture 与 element 颜色同步', () => {
+  it('texture 更新变体：resolve dataUrl 写回现有 record，element 同步', () => {
     const project = projectWithPaper({ texture: true });
-    const tintCache = mockTintCache();
-    const next = applyTextureProperty(project, 'paper-1', { color: '#ff0000' }, tintCache);
-    expect(tintCache.get).toHaveBeenCalledTimes(1);
-    const req = tintCache.get.mock.calls[0][0] as TintedTextureRequest;
-    expect(req.texId).toBe('tex-1');
-    expect(req.color).toBe('#ff0000');
-    expect(next.textures[0].color).toBe('#ff0000');
-    expect(next.textures[0].dataUrl).toBe('url:tex-1:#ff0000:1:0');
+    const plan: TexturePropsPlan = {
+      kind: 'texture',
+      create: false,
+      request: { texId: 'tex-1', style: 'fold', seed: 42, color: '#ff0000', scale: 1, rotate: 0 },
+    };
+    const next = applyTexturePlan(project, 'paper-1', plan, 'data:NEW');
+    expect(next.textures[0]).toMatchObject({
+      id: 'tex-1',
+      color: '#ff0000',
+      scale: 1,
+      rotate: 0,
+      dataUrl: 'data:NEW',
+    });
     expect(next.elements[0].color).toBe('#ff0000');
+    expect(next.elements[0].textureScale).toBe(1);
+    expect(project.textures[0].dataUrl).toBe('data:image/png;base64,OLD'); // 原 project 不可变
   });
 
-  it('纹理缩放越界 clamp 到 0.5–2，element.textureScale 同步', () => {
+  it('texture 新建变体：新 record（request 字段 + dataUrl），element 指向新 id，旧 record 被 prune', () => {
     const project = projectWithPaper({ texture: true });
-    const tintCache = mockTintCache();
-    const next = applyTextureProperty(project, 'paper-1', { scale: 3 }, tintCache);
-    expect(next.textures[0].scale).toBe(MAX_TEXTURE_SCALE);
-    expect(next.elements[0].textureScale).toBe(MAX_TEXTURE_SCALE);
-    expect((tintCache.get.mock.calls[0][0] as TintedTextureRequest).scale).toBe(MAX_TEXTURE_SCALE);
-
-    const low = applyTextureProperty(projectWithPaper({ texture: true }), 'paper-1', { scale: 0.1 }, tintCache);
-    expect(low.textures[0].scale).toBe(MIN_TEXTURE_SCALE);
+    const plan: TexturePropsPlan = {
+      kind: 'texture',
+      create: true,
+      request: { texId: 'tex-2', style: 'grain', seed: 42, color: '#7A8B5C', scale: 1, rotate: 0 },
+    };
+    const next = applyTexturePlan(project, 'paper-1', plan, 'data:NEW');
+    expect(next.elements[0].textureId).toBe('tex-2');
+    const newTex = next.textures.find((t) => t.id === 'tex-2');
+    expect(newTex).toMatchObject({ style: 'grain', seed: 42, dataUrl: 'data:NEW' });
+    expect(next.textures).toHaveLength(1); // 旧 tex-1 不再被引用 → prune
   });
 
-  it('旋转纹理：texture.rotate 更新并重合成', () => {
+  it('新建变体时旧 record 仍被其他纸片引用 → prune 保留', () => {
     const project = projectWithPaper({ texture: true });
-    const tintCache = mockTintCache();
-    const next = applyTextureProperty(project, 'paper-1', { rotate: 90 }, tintCache);
-    expect(next.textures[0].rotate).toBe(90);
-    expect((tintCache.get.mock.calls[0][0] as TintedTextureRequest).rotate).toBe(90);
-  });
-
-  it('切换纹理风格：生成新 texId 记录（同 seed），旧记录被清理', () => {
-    const project = projectWithPaper({ texture: true });
-    const tintCache = mockTintCache();
-    const next = applyTextureProperty(project, 'paper-1', { style: 'grain' }, tintCache);
-    const el = next.elements[0];
-    expect(el.textureId).not.toBe('tex-1');
-    const newTex = next.textures.find((t) => t.id === el.textureId);
-    expect(newTex?.style).toBe('grain');
-    expect(newTex?.seed).toBe(42);
-    expect(next.textures).toHaveLength(1); // 旧 tex-1 不再被引用 → 清理
-    expect((tintCache.get.mock.calls[0][0] as TintedTextureRequest).style).toBe('grain');
-  });
-
-  it('无实质变更返回原 project 引用（no-op）', () => {
-    const project = projectWithPaper({ texture: true });
-    const tintCache = mockTintCache();
-    expect(applyTextureProperty(project, 'paper-1', { color: '#7A8B5C' }, tintCache)).toBe(project);
-    expect(applyTextureProperty(project, 'paper-1', { rotate: 0 }, tintCache)).toBe(project);
-    expect(applyTextureProperty(project, 'paper-1', { scale: 1 }, tintCache)).toBe(project);
-    expect(tintCache.get).not.toHaveBeenCalled();
-  });
-
-  it('已是同风格纹理再点该风格为 no-op（不换 texId）', () => {
-    const project = projectWithPaper({ texture: true }); // 已有 fold
-    const tintCache = mockTintCache();
-    const next = applyTextureProperty(project, 'paper-1', { style: 'fold' }, tintCache);
-    expect(next).toBe(project);
-    expect(tintCache.get).not.toHaveBeenCalled();
-  });
-
-  it('找不到元素返回原 project', () => {
-    const project = projectWithPaper({ texture: true });
-    const tintCache = mockTintCache();
-    expect(applyTextureProperty(project, 'missing', { color: '#ff0000' }, tintCache)).toBe(project);
+    project.elements.push(
+      createPaperElement({
+        id: 'paper-2',
+        path: 'M 0 0 L 1 0 L 0 1 Z',
+        color: '#000000',
+        textureId: 'tex-1',
+      }),
+    );
+    const plan: TexturePropsPlan = {
+      kind: 'texture',
+      create: true,
+      request: { texId: 'tex-2', style: 'grain', seed: 42, color: '#7A8B5C', scale: 1, rotate: 0 },
+    };
+    const next = applyTexturePlan(project, 'paper-1', plan, 'data:NEW');
+    expect(next.textures).toHaveLength(2); // tex-1 仍被 paper-2 引用 → 保留
+    expect(next.textures.some((t) => t.id === 'tex-1')).toBe(true);
   });
 });
 

@@ -1,10 +1,10 @@
 /**
- * T18-b 属性面板 → 画布实时渲染集成测试（主 seam）。
+ * T18-b 属性面板 → 画布实时渲染集成测试（主 seam），#48 更新注入点。
  *
- * 链路：属性面板按钮 → propertyEdit 不可变重合成（mock tintCache 廉价 dataURL）→
- * commitProject（写撤销栈）→ store project 变化 → FabricCanvas → projectRenderer →
- * 共享纹理加载器异步加载 → Pattern 更新。走真实 store（Zustand），RTL 渲染
- * FabricCanvas + PropertyPanel 两个组件。
+ * 链路：属性面板按钮 → store action applyTextureProps（plan → resolve → apply → commit，
+ * mock textureSupply 廉价 compose）→ 写撤销栈 → store project 变化 → FabricCanvas →
+ * projectRenderer → 纹理供给 load 侧异步加载 → Pattern 更新。走真实 store（Zustand），
+ * RTL 渲染 FabricCanvas + PropertyPanel 两个组件；load 侧经 FabricCanvas prop 注入 deferred fake。
  *
  * 覆盖验收：
  * 1. 切 6 种纹理风格任一 → 画布纸片 pattern 源更新为对应新 dataURL 解码源
@@ -16,7 +16,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { Canvas, Pattern } from 'fabric';
-import type { TextureLoader } from '../../texture/loader';
+import type { TextureLoadSide } from '../../texture/supply';
 import { FabricCanvas } from '../canvas/FabricCanvas';
 import { PropertyPanel } from './PropertyPanel';
 import { useProjectStore } from '../../store/projectStore';
@@ -27,16 +27,18 @@ import {
   type PaperProject,
 } from '../../types/project';
 
-// propertyEdit 默认 tintTextureCache 走真实合成（1024² fbm）过慢；注入按维度编码的
-// 廉价 dataURL，让「重合成出新 dataURL」可被加载器与断言观察到。
-vi.mock('../../texture/cache', () => ({
-  tintTextureCache: {
-    get: vi.fn(
-      (request: { style: string; color: string; scale: number; rotate: number }) =>
+// applyTextureProps 默认 textureSupply 走真实合成（1024² fbm）过慢；构造注入按维度编码的
+// 廉价 compose，让「重合成出新 dataURL」可被加载器与断言观察到。
+vi.mock('../../texture/supply', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../texture/supply')>();
+  return {
+    ...actual,
+    textureSupply: actual.createTextureSupply({
+      compose: (request: { style: string; color: string; scale: number; rotate: number }) =>
         `data:image/png;base64,${request.style}|${request.color}|${request.scale}|${request.rotate}`,
-    ),
-  },
-}));
+    }),
+  };
+});
 
 /** jsdom fake 已解码图像源（真实管线在浏览器/Image decode，测试注入）。 */
 const FAKE_SOURCE = {
@@ -62,7 +64,7 @@ function deferred<T>(): Deferred<T> {
 }
 
 /** 可控 fake 纹理加载器：按 dataUrl 返回待决 Promise，测试手动 resolve。 */
-function deferredLoader(): TextureLoader & { resolve: (url: string, src: CanvasImageSource) => void } {
+function deferredLoader(): TextureLoadSide & { resolve: (url: string, src: CanvasImageSource) => void } {
   const pending = new Map<string, Deferred<CanvasImageSource>>();
   const load = vi.fn((dataUrl: string) => {
     const d = deferred<CanvasImageSource>();
@@ -71,8 +73,6 @@ function deferredLoader(): TextureLoader & { resolve: (url: string, src: CanvasI
   });
   return {
     load,
-    size: 0,
-    clear: vi.fn(),
     resolve(url, src) {
       pending.get(url)?.resolve(src);
     },
@@ -88,7 +88,7 @@ function Harness({
   loader,
   onReady,
 }: {
-  loader: TextureLoader;
+  loader: TextureLoadSide;
   onReady: (canvas: Canvas) => void;
 }) {
   const project = useProjectStore((s) => s.project);
