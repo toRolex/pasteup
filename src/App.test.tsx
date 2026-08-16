@@ -204,7 +204,7 @@ describe('App 导出 PNG（T14 seam 8）— 顶栏按钮触发导出 + 下载', 
     useProjectStore.setState({ project: createDefaultProject(), undoStack: [], redoStack: [] });
   });
 
-  it('「导出 PNG」按钮存在，点击后以 project 尺寸文件名触发下载', () => {
+  it('「导出 PNG」按钮存在，点击后以 project 尺寸文件名触发下载', async () => {
     const createSpy = vi.spyOn(document, 'createElement');
     const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
     render(<App />);
@@ -214,6 +214,9 @@ describe('App 导出 PNG（T14 seam 8）— 顶栏按钮触发导出 + 下载', 
 
     fireEvent.click(btn);
 
+    // 导出离线化（#49）后 handleExportPNG 为 async：等待离线导出完成后触发下载
+    await waitFor(() => expect(clickSpy).toHaveBeenCalled());
+
     // 下载锚点：download 属性携带 project 像素尺寸文件名
     const exportAnchor = createSpy.mock.results
       .map((r) => r.value as HTMLAnchorElement)
@@ -221,7 +224,6 @@ describe('App 导出 PNG（T14 seam 8）— 顶栏按钮触发导出 + 下载', 
     expect(exportAnchor).toBeDefined();
     expect(exportAnchor!.download).toBe('pasteup-export-2480x3508.png');
     expect(exportAnchor!.href).toMatch(/^data:image\/png;base64,/);
-    expect(clickSpy).toHaveBeenCalled();
 
     clickSpy.mockRestore();
     createSpy.mockRestore();
@@ -425,14 +427,15 @@ describe('App 导出盖朱红图章（T16 seam 4）— 点导出盖 Pasteup 图�
     expect(screen.queryByTestId('export-stamp')).toBeNull();
   });
 
-  it('点「导出 PNG」→ 出现 Pasteup 图章（class stamp + stamped），下载仍触发', () => {
+  it('点「导出 PNG」→ 出现 Pasteup 图章（class stamp + stamped），下载仍触发', async () => {
     const createSpy = vi.spyOn(document, 'createElement');
     const click = clickSpy();
     render(<App />);
 
     fireEvent.click(screen.getByTestId('export-png'));
 
-    const stamp = screen.getByTestId('export-stamp');
+    // handleExportPNG 为 async（#49）：图章在离线导出 await 之后出现
+    const stamp = await screen.findByTestId('export-stamp');
     expect(stamp).toBeInTheDocument();
     expect(stamp.className).toContain('stamp');
     expect(stamp.className).toContain('stamped');
@@ -449,7 +452,7 @@ describe('App 导出盖朱红图章（T16 seam 4）— 点导出盖 Pasteup 图�
     click.mockRestore();
   });
 
-  it('prefers-reduced-motion：根节点标降级，图章仍瞬时出现（不依赖动画）', () => {
+  it('prefers-reduced-motion：根节点标降级，图章仍瞬时出现（不依赖动画）', async () => {
     mockMatchMedia(true);
     const createSpy = vi.spyOn(document, 'createElement');
     const click = clickSpy();
@@ -458,7 +461,7 @@ describe('App 导出盖朱红图章（T16 seam 4）— 点导出盖 Pasteup 图�
     expect(screen.getByTestId('journal')).toHaveAttribute('data-reduced-motion', 'true');
     fireEvent.click(screen.getByTestId('export-png'));
 
-    const stamp = screen.getByTestId('export-stamp');
+    const stamp = await screen.findByTestId('export-stamp');
     expect(stamp).toBeInTheDocument();
     expect(stamp.className).toContain('stamped');
     expect(stamp.textContent).toContain('Pasteup');

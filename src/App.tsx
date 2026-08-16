@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Canvas } from 'fabric';
 import {
   FabricCanvas,
   type FabricCanvasApi,
@@ -8,7 +7,7 @@ import {
 import { NewProjectDialog } from './components/dialogs/NewProjectDialog';
 import { LayerPanel } from './components/panels/LayerPanel';
 import { PalettePanel } from './components/panels/PalettePanel';
-import { downloadPNG, exportCanvasToPNG } from './export/png';
+import { downloadPNG, exportProjectToPNG } from './export/png';
 import { PropertyPanel } from './components/panels/PropertyPanel';
 import { CharReveal } from './components/brand/CharReveal';
 import { CircleNote } from './components/brand/CircleNote';
@@ -40,7 +39,6 @@ export default function App() {
   const elements = project.elements;
   const bgPhoto = project.bgPhoto;
   const apiRef = useRef<FabricCanvasApi | null>(null);
-  const canvasRef = useRef<Canvas | null>(null);
   const autosaveRef = useRef<ReturnType<typeof createAutosaveController> | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
@@ -88,13 +86,13 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [undo, redo]);
 
-  function handleExportPNG() {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const { dataUrl, width, height } = exportCanvasToPNG(canvas, project);
+  // PNG 导出离线化（#49）：从 schema 经临时 StaticCanvas 重建截屏，不碰活画布；
+  // 无需 canvas 引用，按钮全程可用（旧路径经 onReady 漏出的 canvasRef 已收回）。
+  const handleExportPNG = async () => {
+    const { dataUrl, width, height } = await exportProjectToPNG(project);
     downloadPNG(dataUrl, `pasteup-export-${width}x${height}.png`);
     setStamped(true);
-  }
+  };
 
   const handleExportSvg = async () => {
     const svg = await exportProjectToSVG(project);
@@ -287,7 +285,7 @@ export default function App() {
               className="tool-btn"
               data-testid="export-png"
               aria-label="导出 PNG"
-              onClick={handleExportPNG}
+              onClick={() => void handleExportPNG()}
             >
               导出 PNG
             </button>
@@ -324,7 +322,6 @@ export default function App() {
           onSelectionChange={setSelectedId}
           apiRef={apiRef}
           activeTool={tool}
-          onReady={(c) => { canvasRef.current = c; }}
         />
       </JournalShell>
       <NewProjectDialog open={dialogOpen} onClose={() => setDialogOpen(false)} />

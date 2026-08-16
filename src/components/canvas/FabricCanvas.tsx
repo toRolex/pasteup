@@ -43,8 +43,6 @@ export interface FabricCanvasProps {
   project: PaperProject;
   /** fabric 画布状态变化（用户拖动/旋转纸片等）向上回灌的新项目。 */
   onProjectChange?: (project: PaperProject) => void;
-  /** 画布就绪后暴露 fabric.Canvas 实例（供导出、命中测试等扩展用）。 */
-  onReady?: (canvas: Canvas) => void;
   /** 选中变化（fabric → React 单向事件）：当前选中纸片 id，未选中为 null。 */
   onSelectionChange?: (paperId: string | null) => void;
   /** 导航句柄（单向向下：React → fabric 视口；fabric 事件仍只经 onProjectChange 回灌）。 */
@@ -79,7 +77,6 @@ function readProjectFromCanvas(canvas: Canvas, previous: PaperProject): PaperPro
 export function FabricCanvas({
   project,
   onProjectChange,
-  onReady,
   onSelectionChange,
   apiRef,
   activeTool = 'select',
@@ -90,7 +87,6 @@ export function FabricCanvas({
   const rendererRef = useRef<ProjectRenderer | null>(null);
   const projectRef = useRef(project);
   const onProjectChangeRef = useRef(onProjectChange);
-  const onReadyRef = useRef(onReady);
   const onSelectionChangeRef = useRef(onSelectionChange);
   const apiRefRef = useRef(apiRef);
   const activeToolRef = useRef(activeTool);
@@ -101,7 +97,6 @@ export function FabricCanvas({
 
   projectRef.current = project;
   onProjectChangeRef.current = onProjectChange;
-  onReadyRef.current = onReady;
   onSelectionChangeRef.current = onSelectionChange;
   apiRefRef.current = apiRef;
   activeToolRef.current = activeTool;
@@ -237,8 +232,6 @@ export function FabricCanvas({
         },
       };
     }
-
-    onReadyRef.current?.(canvas);
 
     return () => {
       if (targetApiRef) targetApiRef.current = null;

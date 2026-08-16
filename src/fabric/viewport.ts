@@ -9,7 +9,7 @@ import type { Canvas, TMat2D } from 'fabric';
 export const MIN_ZOOM = 0.05;
 export const MAX_ZOOM = 8;
 
-/** 单位视口矩阵（iMatrix：缩放 1、位移 0）。单份定义，PNG 导出视口复位复用本常量。 */
+/** 单位视口矩阵（iMatrix：缩放 1、位移 0）。单份定义，resetViewport 复用本常量。 */
 export const IDENTITY_VIEWPORT: TMat2D = [1, 0, 0, 1, 0, 0];
 
 function clamp(value: number, min: number, max: number): number {

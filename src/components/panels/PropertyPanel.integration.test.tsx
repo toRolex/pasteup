@@ -40,6 +40,31 @@ vi.mock('../../texture/supply', async (importOriginal) => {
   };
 });
 
+// 测试观察 seam（替代已收回的 onReady prop，#49）：vi.mock 子类化 fabric Canvas 捕获构造实例。
+// 生产壳不再经 prop 外漏 canvas 引用；测试经 lastCanvas() 取最近创建的实例做断言（仍是真实 Canvas 行为）。
+const h = vi.hoisted(() => {
+  const canvases: import('fabric').Canvas[] = [];
+  return {
+    canvases,
+    lastCanvas(): import('fabric').Canvas {
+      const c = canvases[canvases.length - 1];
+      if (!c) throw new Error('FabricCanvas 尚未创建 canvas（测试观察 seam）');
+      return c;
+    },
+  };
+});
+vi.mock('fabric', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('fabric')>();
+  class SpyCanvas extends actual.Canvas {
+    constructor(...args: ConstructorParameters<typeof actual.Canvas>) {
+      super(...args);
+      h.canvases.push(this);
+    }
+  }
+  return { ...actual, Canvas: SpyCanvas };
+});
+const { lastCanvas } = h;
+
 /** jsdom fake 已解码图像源（真实管线在浏览器/Image decode，测试注入）。 */
 const FAKE_SOURCE = {
   width: 64,
@@ -84,17 +109,11 @@ function patternSource(fill: unknown): unknown {
 }
 
 /** 集成 harness：真实 store 驱动，FabricCanvas 单向消费 project，PropertyPanel 提交变更。 */
-function Harness({
-  loader,
-  onReady,
-}: {
-  loader: TextureLoadSide;
-  onReady: (canvas: Canvas) => void;
-}) {
+function Harness({ loader }: { loader: TextureLoadSide }) {
   const project = useProjectStore((s) => s.project);
   return (
     <>
-      <FabricCanvas project={project} textureLoader={loader} onReady={onReady} />
+      <FabricCanvas project={project} textureLoader={loader} />
       <PropertyPanel selectedId="paper-1" />
     </>
   );
@@ -134,7 +153,8 @@ describe('T18-b 集成：属性面板切换纹理风格 → 画布实时重绘�
     async (style) => {
       const loader = deferredLoader();
       let canvas: Canvas | undefined;
-      render(<Harness loader={loader} onReady={(c) => { canvas = c; }} />);
+      render(<Harness loader={loader} />);
+      canvas = lastCanvas();
       expect(canvas!.getObjects()[0].fill).toBe('#7A8B5C'); // 初始纯色
 
       fireEvent.click(screen.getByTestId(`texture-${style}`));
@@ -164,7 +184,8 @@ describe('T18-b 集成：调色 / 缩放 / 旋转 → 纹理重合成新 dataURL
   it('调整纸片颜色 → 重合成新 dataURL，画布 pattern 更新', async () => {
     const loader = deferredLoader();
     let canvas: Canvas | undefined;
-    render(<Harness loader={loader} onReady={(c) => { canvas = c; }} />);
+    render(<Harness loader={loader} />);
+    canvas = lastCanvas();
 
     fireEvent.click(screen.getByTestId('texture-grain'));
     const grainUrl = currentTexture()!.dataUrl;
@@ -190,7 +211,8 @@ describe('T18-b 集成：调色 / 缩放 / 旋转 → 纹理重合成新 dataURL
   it('调整纹理缩放 → 重合成新 dataURL，画布 pattern 更新', async () => {
     const loader = deferredLoader();
     let canvas: Canvas | undefined;
-    render(<Harness loader={loader} onReady={(c) => { canvas = c; }} />);
+    render(<Harness loader={loader} />);
+    canvas = lastCanvas();
 
     fireEvent.click(screen.getByTestId('texture-grain'));
     const grainUrl = currentTexture()!.dataUrl;
@@ -217,7 +239,8 @@ describe('T18-b 集成：调色 / 缩放 / 旋转 → 纹理重合成新 dataURL
   it('调整纹理旋转 → 重合成新 dataURL，画布 pattern 更新', async () => {
     const loader = deferredLoader();
     let canvas: Canvas | undefined;
-    render(<Harness loader={loader} onReady={(c) => { canvas = c; }} />);
+    render(<Harness loader={loader} />);
+    canvas = lastCanvas();
 
     fireEvent.click(screen.getByTestId('texture-grain'));
     const grainUrl = currentTexture()!.dataUrl;
@@ -250,7 +273,8 @@ describe('T18-b 集成：undo/redo 纹理属性变更 → 画布渲染与 store 
   it('切纹理 → 调色 → undo → redo：画布 pattern 源始终对应当前 store dataURL', async () => {
     const loader = deferredLoader();
     let canvas: Canvas | undefined;
-    render(<Harness loader={loader} onReady={(c) => { canvas = c; }} />);
+    render(<Harness loader={loader} />);
+    canvas = lastCanvas();
 
     // 1) 切 grain，完成加载
     fireEvent.click(screen.getByTestId('texture-grain'));
@@ -295,7 +319,8 @@ describe('T18-b 集成：undo/redo 纹理属性变更 → 画布渲染与 store 
   it('undo 清除纹理（回到无纹理快照）→ 画布恢复纯色填充', async () => {
     const loader = deferredLoader();
     let canvas: Canvas | undefined;
-    render(<Harness loader={loader} onReady={(c) => { canvas = c; }} />);
+    render(<Harness loader={loader} />);
+    canvas = lastCanvas();
 
     fireEvent.click(screen.getByTestId('texture-grain'));
     const grainUrl = currentTexture()!.dataUrl;
@@ -331,7 +356,8 @@ describe('T18-b 集成：快速连续切换 / undo/redo → 不出现旧状态�
   it('加载中快速切换两种风格：旧加载结果被丢弃，不覆盖新渲染', async () => {
     const loader = deferredLoader();
     let canvas: Canvas | undefined;
-    render(<Harness loader={loader} onReady={(c) => { canvas = c; }} />);
+    render(<Harness loader={loader} />);
+    canvas = lastCanvas();
 
     // 切 grain（加载中）→ 立即切 watercolor（加载中）
     fireEvent.click(screen.getByTestId('texture-grain'));
@@ -358,7 +384,8 @@ describe('T18-b 集成：快速连续切换 / undo/redo → 不出现旧状态�
   it('加载中切风格后立刻 undo：被撤销风格的加载结果被丢弃，恢复状态正常应用', async () => {
     const loader = deferredLoader();
     let canvas: Canvas | undefined;
-    render(<Harness loader={loader} onReady={(c) => { canvas = c; }} />);
+    render(<Harness loader={loader} />);
+    canvas = lastCanvas();
 
     // 切 grain（加载中）
     fireEvent.click(screen.getByTestId('texture-grain'));
@@ -391,7 +418,8 @@ describe('T18-b 集成：快速连续切换 / undo/redo → 不出现旧状态�
   it('加载中快速 undo×2 → redo×2：最终画布 pattern 对应最终 store 状态，无旧覆盖', async () => {
     const loader = deferredLoader();
     let canvas: Canvas | undefined;
-    render(<Harness loader={loader} onReady={(c) => { canvas = c; }} />);
+    render(<Harness loader={loader} />);
+    canvas = lastCanvas();
 
     // grain → watercolor → marble（均加载中）
     fireEvent.click(screen.getByTestId('texture-grain'));
@@ -441,7 +469,8 @@ describe('T18-b 集成：关闭纹理 → 纸片恢复纯色填充', () => {
   it('加载中点「无」→ 纸片恢复纯色填充；迟到的旧纹理加载不覆盖', async () => {
     const loader = deferredLoader();
     let canvas: Canvas | undefined;
-    render(<Harness loader={loader} onReady={(c) => { canvas = c; }} />);
+    render(<Harness loader={loader} />);
+    canvas = lastCanvas();
 
     // 应用纹理但暂不 resolve（加载中）
     fireEvent.click(screen.getByTestId('texture-grain'));
@@ -466,7 +495,8 @@ describe('T18-b 集成：关闭纹理 → 纸片恢复纯色填充', () => {
   it('纹理已应用后点「无」→ 画布纸片恢复纯色填充（不再显示 pattern）', async () => {
     const loader = deferredLoader();
     let canvas: Canvas | undefined;
-    render(<Harness loader={loader} onReady={(c) => { canvas = c; }} />);
+    render(<Harness loader={loader} />);
+    canvas = lastCanvas();
 
     // 先应用纹理并完成加载（画布显示 pattern）
     fireEvent.click(screen.getByTestId('texture-grain'));

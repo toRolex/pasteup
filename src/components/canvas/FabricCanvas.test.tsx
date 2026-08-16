@@ -8,6 +8,31 @@ import {
   type PaperProject,
 } from '../../types/project';
 
+// 测试观察 seam（替代已收回的 onReady prop，#49）：vi.mock 子类化 fabric Canvas 捕获构造实例。
+// 生产壳不再经 prop 外漏 canvas 引用；测试经 lastCanvas() 取最近创建的实例做断言（仍是真实 Canvas 行为）。
+const h = vi.hoisted(() => {
+  const canvases: import('fabric').Canvas[] = [];
+  return {
+    canvases,
+    lastCanvas(): import('fabric').Canvas {
+      const c = canvases[canvases.length - 1];
+      if (!c) throw new Error('FabricCanvas 尚未创建 canvas（测试观察 seam）');
+      return c;
+    },
+  };
+});
+vi.mock('fabric', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('fabric')>();
+  class SpyCanvas extends actual.Canvas {
+    constructor(...args: ConstructorParameters<typeof actual.Canvas>) {
+      super(...args);
+      h.canvases.push(this);
+    }
+  }
+  return { ...actual, Canvas: SpyCanvas };
+});
+const { lastCanvas } = h;
+
 function projectWithOnePaper(
   transform = { x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1 },
 ): PaperProject {
@@ -32,10 +57,10 @@ describe('FabricCanvas 桥接壳 — 单向通信回灌（fabric 事件 → onPr
     render(
       <FabricCanvas
         project={project}
-        onReady={(c) => { canvas = c; }}
         onProjectChange={onProjectChange}
       />,
     );
+    canvas = lastCanvas();
 
     const obj = canvas!.getObjects()[0];
     obj.set({ left: 120, top: 200, angle: 45 });
@@ -66,7 +91,8 @@ describe('FabricCanvas 导航 API（seam S5）— apiRef 只改视口不动元�
     const apiRef: { current: FabricCanvasApi | null } = { current: null };
     const project = projectWithOnePaper({ x: 24, y: 48, rotation: 0, scaleX: 1, scaleY: 1 });
 
-    render(<FabricCanvas project={project} apiRef={apiRef} onReady={(c) => { canvas = c; }} />);
+    render(<FabricCanvas project={project} apiRef={apiRef} />);
+    canvas = lastCanvas();
 
     expect(apiRef.current).not.toBeNull();
     expect(canvas!.viewportTransform).toEqual([1, 0, 0, 1, 0, 0]);
@@ -127,10 +153,10 @@ describe('FabricCanvas 描摹（seam 5）— trace 工具：采点 → 自动闭
       <FabricCanvas
         project={project}
         activeTool="trace"
-        onReady={(c) => { canvas = c; }}
         onProjectChange={onProjectChange}
       />,
     );
+    canvas = lastCanvas();
 
     canvas!.fire('mouse:down', { ...pointerEvent(10, 10), alreadySelected: false });
     canvas!.fire('mouse:move', pointerEvent(60, 40));
@@ -151,7 +177,8 @@ describe('FabricCanvas 描摹（seam 5）— trace 工具：采点 → 自动闭
     let canvas: Canvas | undefined;
     const project = createEmptyProject(1200, 800);
 
-    render(<FabricCanvas project={project} activeTool="trace" onReady={(c) => { canvas = c; }} />);
+    render(<FabricCanvas project={project} activeTool="trace" />);
+    canvas = lastCanvas();
 
     canvas!.fire('mouse:down', { ...pointerEvent(10, 10), alreadySelected: false });
     canvas!.fire('mouse:move', pointerEvent(60, 40));
@@ -170,10 +197,10 @@ describe('FabricCanvas 描摹（seam 5）— trace 工具：采点 → 自动闭
       <FabricCanvas
         project={project}
         activeTool="trace"
-        onReady={(c) => { canvas = c; }}
         onProjectChange={onProjectChange}
       />,
     );
+    canvas = lastCanvas();
 
     canvas!.fire('mouse:down', { ...pointerEvent(10, 10), alreadySelected: false });
     canvas!.fire('mouse:up', { ...pointerEvent(12, 14), isClick: false });
@@ -190,10 +217,10 @@ describe('FabricCanvas 描摹（seam 5）— trace 工具：采点 → 自动闭
       <FabricCanvas
         project={project}
         activeTool="select"
-        onReady={(c) => { canvas = c; }}
         onProjectChange={onProjectChange}
       />,
     );
+    canvas = lastCanvas();
 
     canvas!.fire('mouse:down', { ...pointerEvent(10, 10), alreadySelected: false });
     canvas!.fire('mouse:move', pointerEvent(60, 40));
@@ -205,14 +232,15 @@ describe('FabricCanvas 描摹（seam 5）— trace 工具：采点 → 自动闭
     let canvas: Canvas | undefined;
     const project = createEmptyProject(1200, 800);
 
-    const { rerender } = render(<FabricCanvas project={project} onReady={(c) => { canvas = c; }} />);
+    const { rerender } = render(<FabricCanvas project={project} />);
+    canvas = lastCanvas();
     expect(canvas!.selection).toBe(true);
 
-    rerender(<FabricCanvas project={project} activeTool="trace" onReady={(c) => { canvas = c; }} />);
+    rerender(<FabricCanvas project={project} activeTool="trace" />);
     expect(canvas!.selection).toBe(false);
     expect(canvas!.skipTargetFind).toBe(true);
 
-    rerender(<FabricCanvas project={project} activeTool="select" onReady={(c) => { canvas = c; }} />);
+    rerender(<FabricCanvas project={project} activeTool="select" />);
     expect(canvas!.selection).toBe(true);
     expect(canvas!.skipTargetFind).toBe(false);
   });
@@ -280,7 +308,8 @@ describe('FabricCanvas 选择/变换（T6 seam 4/5）— select 模式自定义�
     const paper = createPaperElement({ path: L_SHAPE, color: '#c0392b' });
     project.elements.push(paper);
 
-    render(<FabricCanvas project={project} onReady={(c) => { canvas = c; }} />);
+    render(<FabricCanvas project={project} />);
+    canvas = lastCanvas();
 
     clickAt(canvas!, 50, 20); // L 形实体横条 → 选中
     expect(activePaperId(canvas)).toBe(paper.id);
@@ -295,7 +324,8 @@ describe('FabricCanvas 选择/变换（T6 seam 4/5）— select 模式自定义�
     const paper = createPaperElement({ path: RECT, color: '#c0392b' });
     project.elements.push(paper);
 
-    render(<FabricCanvas project={project} onReady={(c) => { canvas = c; }} />);
+    render(<FabricCanvas project={project} />);
+    canvas = lastCanvas();
 
     clickAt(canvas!, 103, 40); // 右边缘外 3px ≤ 容差 4
     expect(activePaperId(canvas)).toBe(paper.id);
@@ -306,7 +336,8 @@ describe('FabricCanvas 选择/变换（T6 seam 4/5）— select 模式自定义�
     const project = createEmptyProject(1200, 800);
     project.elements.push(createPaperElement({ path: RECT, color: '#c0392b' }));
 
-    render(<FabricCanvas project={project} onReady={(c) => { canvas = c; }} />);
+    render(<FabricCanvas project={project} />);
+    canvas = lastCanvas();
 
     clickAt(canvas!, 50, 40);
     expect(canvas!.getActiveObject()).toBeDefined();
@@ -326,7 +357,8 @@ describe('FabricCanvas 选择/变换（T6 seam 4/5）— select 模式自定义�
     });
     project.elements.push(bottom, top);
 
-    render(<FabricCanvas project={project} onReady={(c) => { canvas = c; }} />);
+    render(<FabricCanvas project={project} />);
+    canvas = lastCanvas();
 
     clickAt(canvas!, 75, 60); // 两纸片重叠区
     expect(activePaperId(canvas)).toBe(top.id);
@@ -342,10 +374,10 @@ describe('FabricCanvas 选择/变换（T6 seam 4/5）— select 模式自定义�
     const { rerender } = render(
       <FabricCanvas
         project={project}
-        onReady={(c) => { canvas = c; }}
         onProjectChange={onProjectChange}
       />,
     );
+    canvas = lastCanvas();
 
     clickAt(canvas!, 50, 40);
     expect(activePaperId(canvas)).toBe(paper.id);
@@ -369,7 +401,6 @@ describe('FabricCanvas 选择/变换（T6 seam 4/5）— select 模式自定义�
     rerender(
       <FabricCanvas
         project={next}
-        onReady={(c) => { canvas = c; }}
         onProjectChange={onProjectChange}
       />,
     );
@@ -386,10 +417,10 @@ describe('FabricCanvas 选择/变换（T6 seam 4/5）— select 模式自定义�
     render(
       <FabricCanvas
         project={project}
-        onReady={(c) => { canvas = c; }}
         onProjectChange={onProjectChange}
       />,
     );
+    canvas = lastCanvas();
 
     dispatchMouseDown(canvas!, 50, 40);
     expect(activePaperId(canvas)).toBe(paper.id);
@@ -440,10 +471,10 @@ describe('FabricCanvas 选中联动（T10 seam 4）— fabric 选中 → React �
     render(
       <FabricCanvas
         project={project}
-        onReady={(c) => { canvas = c; }}
         onSelectionChange={onSelectionChange}
       />,
     );
+    canvas = lastCanvas();
 
     clickAt(canvas!, 50, 40);
     expect(onSelectionChange).toHaveBeenLastCalledWith(paper.id);
@@ -467,10 +498,10 @@ describe('FabricCanvas 选中联动（T10 seam 4）— fabric 选中 → React �
     render(
       <FabricCanvas
         project={project}
-        onReady={(c) => { canvas = c; }}
         onSelectionChange={onSelectionChange}
       />,
     );
+    canvas = lastCanvas();
 
     clickAt(canvas!, 50, 40); // A
     expect(onSelectionChange).toHaveBeenLastCalledWith(a.id);

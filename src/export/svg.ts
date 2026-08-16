@@ -13,8 +13,7 @@
  * 纹理 dataURL 加载走纹理供给（`src/texture/supply.ts`，与运行时共用同一条管线，
  * 同一 dataURL 解码结果复用；jsdom 不能真实解码图片，测试注入 fake load adapter）。
  */
-import { StaticCanvas } from 'fabric';
-import { createFabricPath } from '../fabric/paperBridge';
+import { buildStaticCanvas } from './staticScene';
 import { textureSupply, type TextureLoadSide } from '../texture/supply';
 import type { PaperProject } from '../types/project';
 
@@ -57,21 +56,21 @@ export function postProcessSvg(svg: string): string {
 /**
  * 从 project schema 重建纸片并产出 fabric 原生 SVG（不含底图、不含 preamble）。
  *
+ * 离线重建走 PNG/SVG 共享底层 `buildStaticCanvas`（不传第三参，构造上排除底图），toSVG 后 dispose
+ * （此前漏了 dispose，一并补上；dispose 返回 Promise 异步清理，临时 canvas 丢弃引用即可）。
+ *
  * @param sources textureId → 已加载纹理源（缺省/悬空引用回退纯色填充）。
  */
 export function buildRawSvg(
   project: PaperProject,
   sources: Map<string, CanvasImageSource>,
 ): string {
-  const canvas = new StaticCanvas(undefined, {
-    width: project.canvas.width,
-    height: project.canvas.height,
-  });
-  for (const el of project.elements) {
-    const textureSource = el.textureId ? sources.get(el.textureId) : undefined;
-    canvas.add(createFabricPath(el, textureSource));
+  const canvas = buildStaticCanvas(project, sources);
+  try {
+    return canvas.toSVG({ suppressPreamble: true });
+  } finally {
+    void canvas.dispose();
   }
-  return canvas.toSVG({ suppressPreamble: true });
 }
 
 /**
