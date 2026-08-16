@@ -12,6 +12,7 @@
 - **着色（shading）**：把「灰度纹理明度 × 用户选色」合成最终纹理 dataURL 的过程。
 - **描摹（trace）**：在底图上画轮廓的行为；MVP 用自由描绘，点取贴合后置。
 - **拼贴（collage）**：对纸片做变换、图层排序、排版的最终成品状态。
+- **paperBridge**：schema↔fabric 双向映射收拢的 module（`src/fabric/paperBridge.ts`）。正向 `paperToFabricOptions` 纯映射 + `createFabricPath` 构造（含质感）、反向 `readTransform` 单对象 transform 回灌（缺字段 ?? 回落）、paperId 经 `declare module 'fabric'` 声明合并承载（读写类型安全、无强转）、`findPaperObject` 为 fabric 侧按 paperId 定位的唯一 seam。新增 transform 字段只改这一处。
 
 ## 关键技术决策
 

@@ -14,7 +14,7 @@
  * 同一 dataURL 解码结果复用；jsdom 不能真实解码图片，测试注入 fake loader）。
  */
 import { StaticCanvas } from 'fabric';
-import { createFabricPath } from '../fabric/paperFactory';
+import { createFabricPath } from '../fabric/paperBridge';
 import { textureSourceLoader, type TextureLoader } from '../texture/loader';
 import type { PaperProject } from '../types/project';
 

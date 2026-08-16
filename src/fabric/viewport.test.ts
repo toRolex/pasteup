@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { Canvas } from 'fabric';
 import { createEmptyProject, createPaperElement } from '../types/project';
-import { createFabricPath } from './paperFactory';
+import { createFabricPath } from './paperBridge';
 import {
   getZoom,
   MAX_ZOOM,

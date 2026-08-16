@@ -7,9 +7,9 @@
  * - 不依赖 fabric `toObject()` 默认行为，schema 字段显式读写。
  */
 import { useEffect, useRef, type MutableRefObject } from 'react';
-import { Canvas, FabricImage, Path, Pattern, Point, type TPointerEventInfo } from 'fabric';
+import { Canvas, FabricImage, Path, Pattern, Point, type FabricObject, type TPointerEventInfo } from 'fabric';
 import type { PaperProject } from '../../types/project';
-import { createFabricPath } from '../../fabric/paperFactory';
+import { createFabricPath, findPaperObject, readTransform } from '../../fabric/paperBridge';
 import { HIT_TOLERANCE, hitTestElement } from '../../fabric/hitTest';
 import { pointsToOpenPath, tracePointsToPaper } from '../../fabric/traceTool';
 import { getZoom, panBy, resetViewport, zoomBy } from '../../fabric/viewport';
@@ -102,7 +102,7 @@ async function applyTextureWhenReady(
       ? snapshot?.project.textures.find((t) => t.id === element.textureId)
       : undefined;
     if (!element || element.textureId !== textureId || texture?.dataUrl !== dataUrl) return;
-    const obj = canvas.getObjects().find((o) => (o as { paperId?: string }).paperId === paperId);
+    const obj = findPaperObject(canvas, paperId);
     if (!obj) return;
     // ADR 0001 硬性契约：缩放/旋转已在合成时烘焙进位图，pattern 不设 transform
     obj.set('fill', new Pattern({ source, repeat: 'repeat' }));
@@ -125,21 +125,13 @@ function applyBackground(canvas: Canvas, bgPhoto: PaperProject['bgPhoto']): void
   });
 }
 
-/** 从 fabric 画布对象显式读回 transform，回灌成新 project（单向向上，不写回原对象）。 */
-interface ReadableFabricObject {
-  paperId?: string;
-  left?: number;
-  top?: number;
-  angle?: number;
-  scaleX?: number;
-  scaleY?: number;
-}
-
+/** 从 fabric 画布对象显式读回 transform，回灌成新 project（单向向上，不写回原对象）。
+ *  单对象 transform 反向映射走 paperBridge.readTransform（缺字段 ?? 回落先前值）；
+ *  elements 合并（join-key：elements.find(el => el.id === …)）留在本壳，不收进 paperBridge。 */
 function readProjectFromCanvas(canvas: Canvas, previous: PaperProject): PaperProject {
-  const objectById = new Map<string, ReadableFabricObject>();
+  const objectById = new Map<string, FabricObject>();
   for (const obj of canvas.getObjects()) {
-    const o = obj as unknown as ReadableFabricObject;
-    if (o.paperId) objectById.set(o.paperId, o);
+    if (obj.paperId) objectById.set(obj.paperId, obj);
   }
   return {
     ...previous,
@@ -148,13 +140,7 @@ function readProjectFromCanvas(canvas: Canvas, previous: PaperProject): PaperPro
       if (!obj) return el;
       return {
         ...el,
-        transform: {
-          x: obj.left ?? el.transform.x,
-          y: obj.top ?? el.transform.y,
-          rotation: obj.angle ?? el.transform.rotation,
-          scaleX: obj.scaleX ?? el.transform.scaleX,
-          scaleY: obj.scaleY ?? el.transform.scaleY,
-        },
+        transform: readTransform(obj, el.transform),
       };
     }),
   };
@@ -219,7 +205,7 @@ export function FabricCanvas({
       obj: unknown,
       pointer: Point,
     ): boolean {
-      const o = obj as { visible?: boolean; evented?: boolean; paperId?: string };
+      const o = obj as FabricObject;
       if (!o || !o.visible || !o.evented) return false;
       if (!o.paperId) {
         return originalCheckTarget ? originalCheckTarget.call(this, obj, pointer) : false;
@@ -239,7 +225,7 @@ export function FabricCanvas({
     // setActiveObject（selection:created），React 18 批处理下最终状态仍为被恢复纸片。
     const emitSelection = () => {
       const active = canvas.getActiveObject();
-      const paperId = (active as unknown as { paperId?: string } | undefined)?.paperId ?? null;
+      const paperId = active?.paperId ?? null;
       onSelectionChangeRef.current?.(paperId);
     };
     canvas.on('selection:created', emitSelection);
@@ -311,9 +297,7 @@ export function FabricCanvas({
         resetViewport: () => resetViewport(canvas),
         getZoom: () => getZoom(canvas),
         setActiveObject: (paperId) => {
-          const target = canvas
-            .getObjects()
-            .find((o) => (o as { paperId?: string }).paperId === paperId);
+          const target = findPaperObject(canvas, paperId);
           if (!target) return;
           canvas.setActiveObject(target);
           canvas.requestRenderAll();
@@ -366,12 +350,10 @@ export function FabricCanvas({
       }
       return;
     }
-    const activePaperId = (canvas.getActiveObject() as { paperId?: string } | undefined)?.paperId;
+    const activePaperId = canvas.getActiveObject()?.paperId;
     renderProject(canvas, project, textureLoaderRef.current);
     if (activePaperId) {
-      const restored = canvas
-        .getObjects()
-        .find((o) => (o as { paperId?: string }).paperId === activePaperId);
+      const restored = findPaperObject(canvas, activePaperId);
       if (restored) {
         canvas.setActiveObject(restored);
         canvas.requestRenderAll();

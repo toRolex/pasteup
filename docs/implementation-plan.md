@@ -97,7 +97,7 @@ cut/
 │  │  └─ dialogs/                        # 新建/打开/导出
 │  ├─ state/                             # Zustand stores
 │  ├─ fabric/
-│  │  ├─ paperFactory.ts                 # 纸片对象创建/着色
+│  │  ├─ paperBridge.ts                   # paperBridge：schema↔fabric 双向映射收拢（创建/着色/transform 回灌）
 │  │  ├─ traceTool.ts                    # 自由描绘 + 闭合
 │  │  └─ selection.ts                    # 选择/变换/层级
 │  ├─ texture/

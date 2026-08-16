@@ -14,6 +14,7 @@
  * - try/finally 保证 toDataURL 抛错时 backgroundImage 与 viewportTransform 也还原，画布不残留污染状态。
  */
 import type { Canvas, TMat2D } from 'fabric';
+import { IDENTITY_VIEWPORT } from '../fabric/viewport';
 import type { PaperProject } from '../types/project';
 
 export interface PNGExportOptions {
@@ -31,9 +32,7 @@ export interface PNGExportResult {
   height: number;
 }
 
-const IDENTITY_VIEWPORT: TMat2D = [1, 0, 0, 1, 0, 0];
-
-/** 把当前画布导出为 PNG dataURL。底图默认隐藏，视口导出期间复位。 */
+/** 把当前画布导出为 PNG dataURL。底图默认隐藏，视口导出期间复位（复用 viewport 的 IDENTITY_VIEWPORT）。 */
 export function exportCanvasToPNG(
   canvas: Canvas,
   project: PaperProject,

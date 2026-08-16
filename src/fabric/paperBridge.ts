@@ -1,11 +1,30 @@
 /**
- * 纸片 schema → fabric 对象工厂。
+ * paperBridge —— schema↔fabric 双向映射收拢点。
  *
- * 只做「自定义 schema → fabric 对象」的单向映射；反向（fabric → schema）
- * 由桥接壳在事件回灌时显式读取对象属性完成，不依赖 fabric `toObject()` 默认行为。
+ * 收拢纸片 schema 与 fabric 对象之间的全部双向映射，新增 transform 字段只改本文件一处：
+ * - 正向：`paperToFabricOptions` 纯映射 + `createFabricPath` 构造（含 ADR 0001 质感）。
+ * - 反向：`readTransform` 单对象 transform 纯映射（缺字段 ?? 回落 fallback，事件回灌用）。
+ * - paperId 承载：`declare module 'fabric'` 声明合并进 `FabricObject`，读写双向类型安全（无强转）。
+ * - `findPaperObject`：fabric 侧按 paperId 定位纸片的唯一入口。
+ *
+ * 不依赖 fabric `toObject()` 默认行为；正反向手写逐字段 colocate，round-trip 测试防漂移。
+ * （全画布回灌循环仍由桥接壳持有，本 module 只收单对象 readTransform。）
  */
-import { Path, Pattern, Shadow } from 'fabric';
-import type { PaperElement } from '../types/project';
+import { Path, Pattern, Shadow, type Canvas, type FabricObject } from 'fabric';
+import type { PaperElement, ProjectTransform } from '../types/project';
+
+/**
+ * paperId 承载：TS 声明合并。把纸片元素 id（schema `PaperElement.id`）合并进 fabric
+ * `FabricObject`，读写双向类型安全，替代各处针对 paperId 的强转。
+ * 依赖 fabric v7 类型结构；interface+class 合并失败会在编译期 fail-fast（不静默错），
+ * 并由 paperBridge.test 的 type-level 断言兜 fabric 升级。
+ */
+declare module 'fabric' {
+  interface FabricObject {
+    /** 纸片元素 id（schema `PaperElement.id`），事件回灌 / 命令式选中时定位纸片用。 */
+    paperId?: string;
+  }
+}
 
 /** 纸片基础层叠投影（对应 DESIGN.md --shadow-lift：柔和、轻微下沉表达层叠浮起）。 */
 export const PAPER_SHADOW = {
@@ -92,4 +111,36 @@ export function createFabricPath(
   fabricPath.strokeUniform = true;
   fabricPath.strokeLineJoin = 'round';
   return fabricPath;
+}
+
+/** 反向映射的可读 transform 源（fabric 对象侧；字段均可选，缺省由 readTransform 回落 fallback）。 */
+export interface ReadableTransform {
+  left?: number;
+  top?: number;
+  angle?: number;
+  scaleX?: number;
+  scaleY?: number;
+}
+
+/**
+ * 反向纯映射：从 fabric 对象显式读回 transform 为 schema `ProjectTransform`。
+ * 与 `paperToFabricOptions` 手写逐字段对应（colocate 防漂移）；缺字段逐字段 `??` 回落
+ * fallback（通常为该纸片先前 transform，保证事件回灌不丢值；`??` 而非 `||`，0 是有效值）。
+ */
+export function readTransform(
+  obj: ReadableTransform,
+  fallback: ProjectTransform,
+): ProjectTransform {
+  return {
+    x: obj.left ?? fallback.x,
+    y: obj.top ?? fallback.y,
+    rotation: obj.angle ?? fallback.rotation,
+    scaleX: obj.scaleX ?? fallback.scaleX,
+    scaleY: obj.scaleY ?? fallback.scaleY,
+  };
+}
+
+/** fabric 侧按 paperId 定位纸片对象的唯一入口（收拢各处 `getObjects().find(paperId)`）。 */
+export function findPaperObject(canvas: Canvas, paperId: string): FabricObject | undefined {
+  return canvas.getObjects().find((o) => o.paperId === paperId);
 }

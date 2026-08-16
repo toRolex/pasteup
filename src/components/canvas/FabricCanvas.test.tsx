@@ -352,7 +352,7 @@ describe('FabricCanvas 选择/变换（T6 seam 4/5）— select 模式自定义�
   }
 
   function activePaperId(canvas: Canvas | undefined): string | undefined {
-    return (canvas?.getActiveObject() as { paperId?: string } | undefined)?.paperId;
+    return canvas?.getActiveObject()?.paperId;
   }
 
   const RECT = 'M 0 0 L 100 0 L 100 80 L 0 80 Z';

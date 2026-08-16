@@ -14,7 +14,7 @@ import {
   type PaperProject,
 } from '../types/project';
 import { createTextureLoader } from '../texture/loader';
-import { createFabricPath } from '../fabric/paperFactory';
+import { createFabricPath } from '../fabric/paperBridge';
 import {
   buildRawSvg,
   exportProjectToSVG,
