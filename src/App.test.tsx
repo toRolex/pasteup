@@ -7,6 +7,7 @@ import {
   createDefaultProject,
   useProjectStore,
 } from './store/projectStore';
+import { DEFAULT_TOOL, useToolStore } from './store/toolStore';
 
 const exportProjectToSVGMock = vi.hoisted(() => vi.fn());
 const saveSvgFileMock = vi.hoisted(() => vi.fn());
@@ -65,6 +66,12 @@ function mockMatchMedia(matches: boolean): void {
   };
   window.matchMedia = vi.fn().mockReturnValue(mql);
 }
+
+// #59 壳订阅 toolStore：每个用例前复位工具态，消除「用例自身以 select 结尾 + 声明顺序」
+// 的脆弱排序依赖（与 FabricCanvas.test / useScreenPicker.test / App.picker.test 一致）。
+beforeEach(() => {
+  useToolStore.setState({ tool: DEFAULT_TOOL, pickSession: null });
+});
 
 describe('App 集成（seam S3）— 三栏骨架 + store 驱动的画布', () => {
   beforeEach(() => {

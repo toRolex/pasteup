@@ -3,8 +3,8 @@
  *
  * 交互契约（issue #38）：
  * - 触发：工具按钮（activate）+ 全工具快捷键（I）。
- * - 正式取色：取到色 → 写入选色并追加 MRU → 自动切回上一工具；取消 → 仅退出。
- * - 临时取色：按住修饰键（Alt/Option）触发，取到色后停留取色，松开修饰键回到原工具。
+ * - 正式取色：取到色 → 写入选色并追加 MRU → 退出取色会话（工具原样返回）；取消 → 仅退出。
+ * - 临时取色：按住修饰键（Alt/Option）触发，取到色后停留取色，松开修饰键退出会话回到原工具。
  * - Esc：取色中取消退出；结果丢弃。
  * - 输入框 / textarea / contentEditable 聚焦时忽略快捷键（不干扰录入）。
  */
@@ -28,18 +28,18 @@ function isEditableTarget(target: EventTarget | null): boolean {
 
 /**
  * 进入取色 → 系统拾色器 → 写结果 / 退出。
- * 取色期间可能已被 Esc 或松键退出（tool 不再是 picker），此时丢弃结果。
- * 正式取色取完即切回；临时取色停留到修饰键松开。
+ * 取色期间可能已被 Esc 或松键退出（pickSession 已清），此时丢弃结果。
+ * 正式取色取完即退出会话；临时取色停留到修饰键松开。
  */
 async function runPick(opts?: { temporary?: boolean }): Promise<void> {
   const toolStore = useToolStore.getState();
-  if (toolStore.tool === 'picker') return; // 已在取色中，防重复触发
+  if (toolStore.pickSession !== null) return; // 已在取色中，防重复触发
   toolStore.enterPickColor(opts);
   const hex = await pickScreenColorPlatformAware();
   const state = useToolStore.getState();
-  if (state.tool !== 'picker') return; // 取色期间已退出，丢弃结果
+  if (state.pickSession === null) return; // 取色期间已退出，丢弃结果
   if (hex) useEditorStore.getState().applyPickedColor(hex);
-  if (!state.activePickTemporary) {
+  if (!state.pickSession.temporary) {
     useToolStore.getState().exitPickColor();
   }
 }
@@ -54,7 +54,7 @@ export function useScreenPicker() {
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      const isPickMode = useToolStore.getState().tool === 'picker';
+      const isPickMode = useToolStore.getState().pickSession !== null;
       if (e.key === 'Escape' && isPickMode) {
         useToolStore.getState().exitPickColor();
         return;
@@ -78,8 +78,8 @@ export function useScreenPicker() {
     function handleKeyUp(e: KeyboardEvent) {
       if (e.key !== PICK_COLOR_MODIFIER) return;
       const state = useToolStore.getState();
-      // 临时取色：松开修饰键回到原工具
-      if (state.tool === 'picker' && state.activePickTemporary) {
+      // 临时取色：松开修饰键退出取色会话（工具原样返回）
+      if (state.pickSession !== null && state.pickSession.temporary) {
         state.exitPickColor();
       }
     }

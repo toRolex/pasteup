@@ -5,8 +5,9 @@
  * - 单向向下：project 变化 → 经 projectRenderer 命令式同步到 fabric 画布（渲染知识收在 renderer，#47）。
  * - 单向向上：fabric 事件（object:modified）→ 显式读取对象属性回灌 onProjectChange。
  * - 不依赖 fabric `toObject()` 默认行为，schema 字段显式读写。
- * 本壳只剩交互职责：trace 状态机 / selection 事件 / _checkTarget 命中 / object:modified 回灌 /
- * apiRef 导航 / 工具切换；渲染同步（失效判定 / 重建 / 纹理补丁 / selection 恢复）归 projectRenderer。
+ * 本壳只剩交互职责：trace 状态机（含取色挂起中止笔迹）/ selection 事件 / _checkTarget 命中 /
+ * object:modified 回灌 / apiRef 导航 / 工具切换；渲染同步（失效判定 / 重建 / 纹理补丁 /
+ * selection 恢复）归 projectRenderer。
  */
 import { useEffect, useRef, type MutableRefObject } from 'react';
 import { Canvas, Path, Point, type FabricObject, type TPointerEventInfo } from 'fabric';
@@ -17,13 +18,11 @@ import { HIT_TOLERANCE, hitTestElement } from '../../fabric/hitTest';
 import { pointsToOpenPath, tracePointsToPaper } from '../../fabric/traceTool';
 import { getZoom, panBy, resetViewport, zoomBy } from '../../fabric/viewport';
 import { textureSupply, type TextureLoadSide } from '../../texture/supply';
+import { useToolStore } from '../../store/toolStore';
 
 /** 描摹笔迹（临时）：ink 墨色半透明，模拟手绘描线（DESIGN.md ink-line）。 */
 const TRACE_STROKE = 'rgba(90, 70, 52, 0.55)';
 const TRACE_STROKE_WIDTH = 3;
-
-/** 画布当前工具：select 默认选择/移动；trace 自由描绘。 */
-export type FabricTool = 'select' | 'trace';
 
 /** React→fabric 命令式导航句柄（只承载视口操作与命令式选中，不承载元素读写）。 */
 export interface FabricCanvasApi {
@@ -47,8 +46,6 @@ export interface FabricCanvasProps {
   onSelectionChange?: (paperId: string | null) => void;
   /** 导航句柄（单向向下：React → fabric 视口；fabric 事件仍只经 onProjectChange 回灌）。 */
   apiRef?: MutableRefObject<FabricCanvasApi | null>;
-  /** 当前工具：trace 进入自由描绘（采点 → 自动闭合 → 纸片回灌）。 */
-  activeTool?: FabricTool;
   /** 纹理供给 load 侧（T18 运行时与导出共用同一条管线；默认应用级单例，测试注入 fake）。 */
   textureLoader?: TextureLoadSide;
 }
@@ -79,9 +76,10 @@ export function FabricCanvas({
   onProjectChange,
   onSelectionChange,
   apiRef,
-  activeTool = 'select',
   textureLoader = textureSupply,
 }: FabricCanvasProps) {
+  const tool = useToolStore((s) => s.tool);
+  const pickSession = useToolStore((s) => s.pickSession);
   const containerElRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<Canvas | null>(null);
   const rendererRef = useRef<ProjectRenderer | null>(null);
@@ -89,17 +87,18 @@ export function FabricCanvas({
   const onProjectChangeRef = useRef(onProjectChange);
   const onSelectionChangeRef = useRef(onSelectionChange);
   const apiRefRef = useRef(apiRef);
-  const activeToolRef = useRef(activeTool);
+  const activeToolRef = useRef(tool);
   const textureLoaderRef = useRef(textureLoader);
   const pointsRef = useRef<{ x: number; y: number }[]>([]);
   const tempPathRef = useRef<Path | null>(null);
   const drawingRef = useRef(false);
+  const prevPickSessionRef = useRef(pickSession);
 
   projectRef.current = project;
   onProjectChangeRef.current = onProjectChange;
   onSelectionChangeRef.current = onSelectionChange;
   apiRefRef.current = apiRef;
-  activeToolRef.current = activeTool;
+  activeToolRef.current = tool;
   textureLoaderRef.current = textureLoader;
 
   // 挂载：创建 fabric 画布并订阅事件（fabric 拥有画布内部状态）。
@@ -247,11 +246,28 @@ export function FabricCanvas({
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const isTrace = activeTool === 'trace';
+    const isTrace = tool === 'trace';
     canvas.selection = !isTrace;
     canvas.skipTargetFind = isTrace;
     canvas.defaultCursor = isTrace ? 'crosshair' : 'default';
-  }, [activeTool]);
+  }, [tool]);
+
+  // 取色挂起（pickSession null→非 null）且描绘进行中：命令式中止进行中笔迹
+  // （清 pointsRef、移除 tempPath、drawingRef=false），不产生纸片——修复 trace 下
+  // 取色残留幽灵笔迹 bug。drawingRef=false 同时短路后续 mouse:up，与 handleTraceUp
+  // 互斥（tempPath 不会双移除）。
+  useEffect(() => {
+    const wasPicking = prevPickSessionRef.current !== null;
+    const isPicking = pickSession !== null;
+    prevPickSessionRef.current = pickSession;
+    if (isPicking && !wasPicking && drawingRef.current) {
+      pointsRef.current = [];
+      if (tempPathRef.current) canvasRef.current?.remove(tempPathRef.current);
+      tempPathRef.current = null;
+      drawingRef.current = false;
+      canvasRef.current?.requestRenderAll();
+    }
+  }, [pickSession]);
 
   // 单向向下：project 变化时同步到画布。渲染知识（失效判定三态 / 全量重建 / 底图可见性 /
   // 异步纹理补丁 / selection 恢复）全部收进 projectRenderer（#47），壳只转发一句 render。

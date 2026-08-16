@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import {
   FabricCanvas,
   type FabricCanvasApi,
-  type FabricTool,
 } from './components/canvas/FabricCanvas';
 import { NewProjectDialog } from './components/dialogs/NewProjectDialog';
 import { LayerPanel } from './components/panels/LayerPanel';
@@ -14,6 +13,7 @@ import { CircleNote } from './components/brand/CircleNote';
 import { useScreenPicker } from './picker/useScreenPicker';
 import { JournalShell } from './styles/journalLayout';
 import { useProjectStore, type SaveStatus } from './store/projectStore';
+import { useToolStore } from './store/toolStore';
 import { exportProjectToSVG, saveSvgFile } from './export/svg';
 import { createAutosaveController } from './io/autosave';
 import { pickOpenPath, pickSavePath, readProjectFile, writeProjectFile } from './io/projectFile';
@@ -43,7 +43,8 @@ export default function App() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
   const { activate: activatePicker } = useScreenPicker();
-  const [tool, setTool] = useState<FabricTool>('select');
+  // #59 工具单一真相在 toolStore：按钮读高亮 / 写 setTool，不重复持有本地工具态。
+  const tool = useToolStore((s) => s.tool);
   // T10/T11 选中联动：fabric 选中 → onSelectionChange 单向上报当前纸片 id → 图层面板 + 属性面板。
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // T16 导出图章：点导出盖朱红「Pasteup」图章（CSS 动效，reduced-motion 瞬时）。
@@ -174,7 +175,7 @@ export default function App() {
               className={`tool-btn${tool === 'select' ? ' tool-btn--active' : ''}`}
               data-testid="tool-select"
               aria-pressed={tool === 'select'}
-              onClick={() => setTool('select')}
+              onClick={() => useToolStore.getState().setTool('select')}
             >
               选择
             </button>
@@ -182,7 +183,7 @@ export default function App() {
               className={`tool-btn${tool === 'trace' ? ' tool-btn--active' : ''}`}
               data-testid="tool-trace"
               aria-pressed={tool === 'trace'}
-              onClick={() => setTool('trace')}
+              onClick={() => useToolStore.getState().setTool('trace')}
             >
               描绘
             </button>
@@ -321,7 +322,6 @@ export default function App() {
           onProjectChange={commitProject}
           onSelectionChange={setSelectedId}
           apiRef={apiRef}
-          activeTool={tool}
         />
       </JournalShell>
       <NewProjectDialog open={dialogOpen} onClose={() => setDialogOpen(false)} />

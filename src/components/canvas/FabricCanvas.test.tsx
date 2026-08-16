@@ -1,7 +1,8 @@
-import { describe, expect, it, vi } from 'vitest';
-import { render } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, render } from '@testing-library/react';
 import { Canvas, Point, type TPointerEventInfo } from 'fabric';
 import { FabricCanvas, type FabricCanvasApi } from './FabricCanvas';
+import { useToolStore } from '../../store/toolStore';
 import {
   createEmptyProject,
   createPaperElement,
@@ -32,6 +33,11 @@ vi.mock('fabric', async (importOriginal) => {
   return { ...actual, Canvas: SpyCanvas };
 });
 const { lastCanvas } = h;
+
+// 壳直接订阅 toolStore（#59）：每个用例前复位工具态，避免跨用例污染。
+beforeEach(() => {
+  useToolStore.setState({ tool: 'select', pickSession: null });
+});
 
 function projectWithOnePaper(
   transform = { x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1 },
@@ -149,10 +155,10 @@ describe('FabricCanvas 描摹（seam 5）— trace 工具：采点 → 自动闭
     const onProjectChange = vi.fn();
     const project = createEmptyProject(1200, 800);
 
+    useToolStore.setState({ tool: 'trace' });
     render(
       <FabricCanvas
         project={project}
-        activeTool="trace"
         onProjectChange={onProjectChange}
       />,
     );
@@ -177,7 +183,8 @@ describe('FabricCanvas 描摹（seam 5）— trace 工具：采点 → 自动闭
     let canvas: Canvas | undefined;
     const project = createEmptyProject(1200, 800);
 
-    render(<FabricCanvas project={project} activeTool="trace" />);
+    useToolStore.setState({ tool: 'trace' });
+    render(<FabricCanvas project={project} />);
     canvas = lastCanvas();
 
     canvas!.fire('mouse:down', { ...pointerEvent(10, 10), alreadySelected: false });
@@ -193,10 +200,10 @@ describe('FabricCanvas 描摹（seam 5）— trace 工具：采点 → 自动闭
     const onProjectChange = vi.fn();
     const project = createEmptyProject(1200, 800);
 
+    useToolStore.setState({ tool: 'trace' });
     render(
       <FabricCanvas
         project={project}
-        activeTool="trace"
         onProjectChange={onProjectChange}
       />,
     );
@@ -216,7 +223,6 @@ describe('FabricCanvas 描摹（seam 5）— trace 工具：采点 → 自动闭
     render(
       <FabricCanvas
         project={project}
-        activeTool="select"
         onProjectChange={onProjectChange}
       />,
     );
@@ -232,17 +238,42 @@ describe('FabricCanvas 描摹（seam 5）— trace 工具：采点 → 自动闭
     let canvas: Canvas | undefined;
     const project = createEmptyProject(1200, 800);
 
-    const { rerender } = render(<FabricCanvas project={project} />);
+    render(<FabricCanvas project={project} />);
     canvas = lastCanvas();
     expect(canvas!.selection).toBe(true);
 
-    rerender(<FabricCanvas project={project} activeTool="trace" />);
+    act(() => useToolStore.getState().setTool('trace'));
     expect(canvas!.selection).toBe(false);
     expect(canvas!.skipTargetFind).toBe(true);
 
-    rerender(<FabricCanvas project={project} activeTool="select" />);
+    act(() => useToolStore.getState().setTool('select'));
     expect(canvas!.selection).toBe(true);
     expect(canvas!.skipTargetFind).toBe(false);
+  });
+
+  it('取色挂起（trace 描绘中）中止进行中笔迹，不产生纸片（幽灵笔迹 bug 修复）', () => {
+    let canvas: Canvas | undefined;
+    const onProjectChange = vi.fn();
+    const project = createEmptyProject(1200, 800);
+
+    useToolStore.setState({ tool: 'trace' });
+    render(<FabricCanvas project={project} onProjectChange={onProjectChange} />);
+    canvas = lastCanvas();
+
+    // 开始描摹（mouse down + move → 临时笔迹出现）
+    canvas!.fire('mouse:down', { ...pointerEvent(10, 10), alreadySelected: false });
+    canvas!.fire('mouse:move', pointerEvent(60, 40));
+    expect(canvas!.getObjects()).toHaveLength(1);
+
+    // 进入取色（pickSession null→非 null）：命令式中止进行中笔迹
+    act(() => useToolStore.getState().enterPickColor({ temporary: true }));
+    expect(canvas!.getObjects()).toHaveLength(0); // 临时笔迹已移除
+    expect(onProjectChange).not.toHaveBeenCalled(); // 未产生纸片
+
+    // 取色期间松开鼠标：drawingRef=false 短路 mouse:up，不补产生纸片、tempPath 不双移除
+    canvas!.fire('mouse:up', { ...pointerEvent(160, 120), isClick: false });
+    expect(onProjectChange).not.toHaveBeenCalled();
+    expect(canvas!.getObjects()).toHaveLength(0);
   });
 });
 
