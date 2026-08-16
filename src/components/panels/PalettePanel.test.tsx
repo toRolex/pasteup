@@ -4,7 +4,7 @@
  * T16 seam 2：点色联动——有选中纸片时点 MRU 色同时给纸片着色（走 applyTextureProps action）。
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { DEFAULT_CURRENT_COLOR, useEditorStore } from '../../store/editorStore';
 import { useProjectStore } from '../../store/projectStore';
 import { createEmptyProject, createPaperElement, createPaperTexture } from '../../types/project';
@@ -85,11 +85,8 @@ describe('PalettePanel（S6）— 当前色 + MRU 色区', () => {
 describe('PalettePanel 点色联动（T16 seam 2）— 点色给选中纸片着色', () => {
   beforeEach(() => {
     useEditorStore.setState({ currentColor: DEFAULT_CURRENT_COLOR, recentColors: [] });
-    useProjectStore.setState({
-      project: createEmptyProject(1200, 800),
-      undoStack: [],
-      redoStack: [],
-    });
+    // 逐例隔离：createProject 重置项目 + history.clear()（私有历史不跨用例堆积）
+    useProjectStore.getState().createProject('portrait', 300);
   });
 
   it('有选中纸片：点 MRU 色 → element.color + texture.color 更新（重合成）+ currentColor 同步', () => {
@@ -103,25 +100,33 @@ describe('PalettePanel 点色联动（T16 seam 2）— 点色给选中纸片着�
     expect(st.project.elements[0].color).toBe('#c0392b');
     expect(st.project.textures[0].color).toBe('#c0392b'); // 纹理同步变色 → 触发重合成
     expect(useEditorStore.getState().currentColor).toBe('#c0392b');
-    expect(st.undoStack).toHaveLength(1); // 走 commitProject 可撤销
+
+    act(() => {
+      useProjectStore.getState().undo();
+    });
+    expect(useProjectStore.getState().project.elements[0].color).toBe('#7A8B5C'); // 可撤销回退
   });
 
-  it('有选中纸片但 MRU 色与当前元素色相同：no-op 不入撤销栈（applyTextureProps 防线一）', () => {
-    // 选中纸片已是 #7A8B5C，点回同色 → 无实质变更 → 不入撤销栈（避免污染历史）
+  it('有选中纸片但 MRU 色与当前元素色相同：no-op 不产生独立撤销记录（applyTextureProps 防线一）', () => {
     useProjectStore.setState({ project: projectWithPaper() });
-    useEditorStore.setState({ recentColors: ['#7A8B5C'] });
+    useEditorStore.setState({ recentColors: ['#c0392b', '#7A8B5C'] });
     render(<PalettePanel selectedId="paper-1" />);
 
-    fireEvent.click(screen.getByTestId('recent-color-7A8B5C'));
-
-    const st = useProjectStore.getState();
-    expect(st.project.elements[0].color).toBe('#7A8B5C');
-    expect(st.undoStack).toHaveLength(0);
+    // 先做一次真实编辑建立基线，再点同色 no-op
+    fireEvent.click(screen.getByTestId('recent-color-c0392b'));
+    expect(useProjectStore.getState().project.elements[0].color).toBe('#c0392b');
+    fireEvent.click(screen.getByTestId('recent-color-c0392b')); // 同色 no-op（防线一）
+    // 一次 undo 应回退真实编辑（→ #7A8B5C）；若 no-op 入栈则 undo 停在 #c0392b
+    act(() => {
+      useProjectStore.getState().undo();
+    });
+    expect(useProjectStore.getState().project.elements[0].color).toBe('#7A8B5C');
   });
 
   it('无选中纸片：点 MRU 只改 currentColor，不动项目', () => {
     useProjectStore.setState({ project: projectWithPaper() });
     useEditorStore.setState({ recentColors: ['#c0392b'] });
+    const before = useProjectStore.getState().project;
     render(<PalettePanel selectedId={null} />);
 
     fireEvent.click(screen.getByTestId('recent-color-c0392b'));
@@ -130,6 +135,6 @@ describe('PalettePanel 点色联动（T16 seam 2）— 点色给选中纸片着�
     expect(st.project.elements[0].color).toBe('#7A8B5C');
     expect(st.project.textures[0].color).toBe('#7A8B5C');
     expect(useEditorStore.getState().currentColor).toBe('#c0392b');
-    expect(st.undoStack).toHaveLength(0);
+    expect(st.project).toBe(before); // 未产生任何项目变更
   });
 });

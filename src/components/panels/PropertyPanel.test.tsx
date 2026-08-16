@@ -53,11 +53,8 @@ function projectWithPaper(options: { texture?: boolean } = {}): ReturnType<typeo
 
 describe('PropertyPanel 渲染（seam 6）', () => {
   beforeEach(() => {
-    useProjectStore.setState({
-      project: createEmptyProject(1200, 800),
-      undoStack: [],
-      redoStack: [],
-    });
+    // 逐例隔离：createProject 重置项目 + history.clear()（私有历史不跨用例堆积）
+    useProjectStore.getState().createProject('portrait', 300);
     useEditorStore.setState({ currentColor: '#000000', recentColors: [] });
   });
 
@@ -95,11 +92,8 @@ describe('PropertyPanel 渲染（seam 6）', () => {
 
 describe('PropertyPanel 属性编辑（seam 3）— 经 commitProject 可撤销', () => {
   beforeEach(() => {
-    useProjectStore.setState({
-      project: createEmptyProject(1200, 800),
-      undoStack: [],
-      redoStack: [],
-    });
+    // 逐例隔离：createProject 重置项目 + history.clear()（私有历史不跨用例堆积）
+    useProjectStore.getState().createProject('portrait', 300);
     useEditorStore.setState({ currentColor: '#000000', recentColors: [] });
   });
 
@@ -112,7 +106,11 @@ describe('PropertyPanel 属性编辑（seam 3）— 经 commitProject 可撤销'
     expect(el.textureId).not.toBeNull();
     const tex = st.project.textures.find((t) => t.id === el.textureId);
     expect(tex?.style).toBe('grain');
-    expect(st.undoStack).toHaveLength(1);
+
+    act(() => {
+      useProjectStore.getState().undo();
+    });
+    expect(useProjectStore.getState().project.elements[0].textureId).toBeNull(); // 可撤销回退
   });
 
   it('点击「无」清除纹理并清理纹理记录', () => {
@@ -174,13 +172,104 @@ describe('PropertyPanel 属性编辑（seam 3）— 经 commitProject 可撤销'
   });
 });
 
+describe('PropertyPanel 滑杆手势合并（#50）— 同手势一条撤销记录、不同手势断开', () => {
+  beforeEach(() => {
+    // 逐例隔离：createProject 重置项目 + history.clear()（私有历史不跨用例堆积）
+    useProjectStore.getState().createProject('portrait', 300);
+    useEditorStore.setState({ currentColor: '#000000', recentColors: [] });
+  });
+
+  it('拖动滑杆一次（pointerdown + 连续 change）只产生一条撤销记录', () => {
+    useProjectStore.setState({ project: projectWithPaper() });
+    render(<PropertyPanel selectedId="paper-1" />);
+    const slider = screen.getByTestId('opacity-slider');
+
+    fireEvent.pointerDown(slider);
+    fireEvent.change(slider, { target: { value: '0.9' } });
+    fireEvent.change(slider, { target: { value: '0.7' } });
+    fireEvent.change(slider, { target: { value: '0.5' } });
+    fireEvent.pointerUp(slider);
+    expect(useProjectStore.getState().project.elements[0].opacity).toBe(0.5);
+
+    act(() => {
+      useProjectStore.getState().undo();
+    });
+    expect(useProjectStore.getState().project.elements[0].opacity).toBe(1); // 一次 undo 回到手势前
+  });
+
+  it('两次拖拽（不同手势）断开为两条撤销记录', () => {
+    useProjectStore.setState({ project: projectWithPaper() });
+    render(<PropertyPanel selectedId="paper-1" />);
+    const slider = screen.getByTestId('opacity-slider');
+
+    fireEvent.pointerDown(slider);
+    fireEvent.change(slider, { target: { value: '0.8' } });
+    fireEvent.pointerUp(slider);
+    fireEvent.pointerDown(slider);
+    fireEvent.change(slider, { target: { value: '0.6' } });
+    fireEvent.pointerUp(slider);
+    expect(useProjectStore.getState().project.elements[0].opacity).toBe(0.6);
+
+    act(() => {
+      useProjectStore.getState().undo();
+    });
+    expect(useProjectStore.getState().project.elements[0].opacity).toBe(0.8); // 撤第二个手势
+    act(() => {
+      useProjectStore.getState().undo();
+    });
+    expect(useProjectStore.getState().project.elements[0].opacity).toBe(1); // 撤第一个手势
+  });
+
+  it('键盘方向键连续改值（同手势）合并为一条撤销记录', () => {
+    useProjectStore.setState({ project: projectWithPaper() });
+    render(<PropertyPanel selectedId="paper-1" />);
+    const slider = screen.getByTestId('opacity-slider');
+
+    fireEvent.keyDown(slider, { key: 'ArrowRight' });
+    fireEvent.change(slider, { target: { value: '0.9' } });
+    fireEvent.keyDown(slider, { key: 'ArrowRight' });
+    fireEvent.change(slider, { target: { value: '0.8' } });
+    expect(useProjectStore.getState().project.elements[0].opacity).toBe(0.8);
+
+    act(() => {
+      useProjectStore.getState().undo();
+    });
+    expect(useProjectStore.getState().project.elements[0].opacity).toBe(1); // 一次 undo 回到键盘手势前
+  });
+
+  it('兄弟滑杆 blur 不误杀本滑杆手势（先拖不透明度再拖缩放各自独立合并）', () => {
+    useProjectStore.setState({ project: projectWithPaper({ texture: true }) });
+    render(<PropertyPanel selectedId="paper-1" />);
+    const opacity = screen.getByTestId('opacity-slider');
+    const scale = screen.getByTestId('scale-slider');
+
+    // 拖 opacity（获焦）→ 收手势
+    fireEvent.pointerDown(opacity);
+    fireEvent.change(opacity, { target: { value: '0.8' } });
+    fireEvent.pointerUp(opacity);
+
+    // 点 scale：pointerdown(scale) 起手势后，opacity 的 blur 触发 endGesture —— 不应清掉 scale 的手势
+    fireEvent.pointerDown(scale);
+    fireEvent.blur(opacity); // 真实浏览器中，鼠标移向 scale 时 opacity 失焦
+    fireEvent.change(scale, { target: { value: '160' } });
+    fireEvent.change(scale, { target: { value: '120' } });
+    fireEvent.change(scale, { target: { value: '100' } });
+    fireEvent.pointerUp(scale);
+    expect(useProjectStore.getState().project.elements[0].textureScale).toBe(1);
+
+    act(() => {
+      useProjectStore.getState().undo();
+    });
+    // 一次 undo 回到 scale 手势前：textureScale 复位、opacity 手势不受影响
+    expect(useProjectStore.getState().project.elements[0].textureScale).toBe(1.5);
+    expect(useProjectStore.getState().project.elements[0].opacity).toBe(0.8);
+  });
+});
+
 describe('PropertyPanel 便签打勾（T16 seam 3）— 属性变更后出现打勾反馈', () => {
   beforeEach(() => {
-    useProjectStore.setState({
-      project: createEmptyProject(1200, 800),
-      undoStack: [],
-      redoStack: [],
-    });
+    // 逐例隔离：createProject 重置项目 + history.clear()（私有历史不跨用例堆积）
+    useProjectStore.getState().createProject('portrait', 300);
     useEditorStore.setState({ currentColor: '#000000', recentColors: [] });
   });
 

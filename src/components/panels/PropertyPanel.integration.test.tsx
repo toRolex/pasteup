@@ -2,7 +2,7 @@
  * T18-b 属性面板 → 画布实时渲染集成测试（主 seam），#48 更新注入点。
  *
  * 链路：属性面板按钮 → store action applyTextureProps（plan → resolve → apply → commit，
- * mock textureSupply 廉价 compose）→ 写撤销栈 → store project 变化 → FabricCanvas →
+ * mock textureSupply 廉价 compose）→ 写撤销历史（History module）→ store project 变化 → FabricCanvas →
  * projectRenderer → 纹理供给 load 侧异步加载 → Pattern 更新。走真实 store（Zustand），
  * RTL 渲染 FabricCanvas + PropertyPanel 两个组件；load 侧经 FabricCanvas prop 注入 deferred fake。
  *
@@ -144,7 +144,9 @@ function currentTexture() {
 
 describe('T18-b 集成：属性面板切换纹理风格 → 画布实时重绘（6 种）', () => {
   beforeEach(() => {
-    useProjectStore.setState({ project: projectWithPaper(), undoStack: [], redoStack: [] });
+    // 逐例隔离：先清历史（createProject）再置自定义项目
+    useProjectStore.getState().createProject('portrait', 300);
+    useProjectStore.setState({ project: projectWithPaper() });
     useEditorStore.setState({ currentColor: '#000000', recentColors: [] });
   });
 
@@ -177,7 +179,9 @@ describe('T18-b 集成：属性面板切换纹理风格 → 画布实时重绘�
 
 describe('T18-b 集成：调色 / 缩放 / 旋转 → 纹理重合成新 dataURL → 画布 pattern 更新', () => {
   beforeEach(() => {
-    useProjectStore.setState({ project: projectWithPaper(), undoStack: [], redoStack: [] });
+    // 逐例隔离：先清历史（createProject）再置自定义项目
+    useProjectStore.getState().createProject('portrait', 300);
+    useProjectStore.setState({ project: projectWithPaper() });
     useEditorStore.setState({ currentColor: '#000000', recentColors: [] });
   });
 
@@ -266,7 +270,9 @@ describe('T18-b 集成：调色 / 缩放 / 旋转 → 纹理重合成新 dataURL
 
 describe('T18-b 集成：undo/redo 纹理属性变更 → 画布渲染与 store 一致', () => {
   beforeEach(() => {
-    useProjectStore.setState({ project: projectWithPaper(), undoStack: [], redoStack: [] });
+    // 逐例隔离：先清历史（createProject）再置自定义项目
+    useProjectStore.getState().createProject('portrait', 300);
+    useProjectStore.setState({ project: projectWithPaper() });
     useEditorStore.setState({ currentColor: '#000000', recentColors: [] });
   });
 
@@ -349,7 +355,9 @@ describe('T18-b 集成：undo/redo 纹理属性变更 → 画布渲染与 store 
 
 describe('T18-b 集成：快速连续切换 / undo/redo → 不出现旧状态覆盖', () => {
   beforeEach(() => {
-    useProjectStore.setState({ project: projectWithPaper(), undoStack: [], redoStack: [] });
+    // 逐例隔离：先清历史（createProject）再置自定义项目
+    useProjectStore.getState().createProject('portrait', 300);
+    useProjectStore.setState({ project: projectWithPaper() });
     useEditorStore.setState({ currentColor: '#000000', recentColors: [] });
   });
 
@@ -462,7 +470,9 @@ describe('T18-b 集成：快速连续切换 / undo/redo → 不出现旧状态�
 
 describe('T18-b 集成：关闭纹理 → 纸片恢复纯色填充', () => {
   beforeEach(() => {
-    useProjectStore.setState({ project: projectWithPaper(), undoStack: [], redoStack: [] });
+    // 逐例隔离：先清历史（createProject）再置自定义项目
+    useProjectStore.getState().createProject('portrait', 300);
+    useProjectStore.setState({ project: projectWithPaper() });
     useEditorStore.setState({ currentColor: '#000000', recentColors: [] });
   });
 

@@ -68,7 +68,7 @@ function mockMatchMedia(matches: boolean): void {
 
 describe('App 集成（seam S3）— 三栏骨架 + store 驱动的画布', () => {
   beforeEach(() => {
-    useProjectStore.setState({ project: createDefaultProject(), undoStack: [], redoStack: [] });
+    useProjectStore.getState().createProject('portrait', 300);
   });
 
   it('渲染三栏骨架，grid 尺寸 56 / 260 / 34 / 280', () => {
@@ -143,11 +143,7 @@ describe('App 集成（seam S3）— 三栏骨架 + store 驱动的画布', () =
 
 describe('App 撤销/重做（T9 seam U7）— 顶栏按钮 + 快捷键', () => {
   beforeEach(() => {
-    useProjectStore.setState({
-      project: createDefaultProject(),
-      undoStack: [],
-      redoStack: [],
-    });
+    useProjectStore.getState().createProject('portrait', 300);
   });
 
   it('顶栏提供撤销/重做按钮', () => {
@@ -201,7 +197,7 @@ describe('App 撤销/重做（T9 seam U7）— 顶栏按钮 + 快捷键', () => 
 
 describe('App 导出 PNG（T14 seam 8）— 顶栏按钮触发导出 + 下载', () => {
   beforeEach(() => {
-    useProjectStore.setState({ project: createDefaultProject(), undoStack: [], redoStack: [] });
+    useProjectStore.getState().createProject('portrait', 300);
   });
 
   it('「导出 PNG」按钮存在，点击后以 project 尺寸文件名触发下载', async () => {
@@ -234,7 +230,7 @@ describe('App 集成（S5）— 顶栏「导出 SVG」按钮触发导出 + 下�
   beforeEach(() => {
     exportProjectToSVGMock.mockReset();
     saveSvgFileMock.mockReset();
-    useProjectStore.setState({ project: createDefaultProject() });
+    useProjectStore.getState().createProject('portrait', 300);
   });
 
   it('顶栏渲染「导出 SVG」按钮', () => {
@@ -258,11 +254,7 @@ describe('App 集成（S5）— 顶栏「导出 SVG」按钮触发导出 + 下�
 
 describe('App 图层面板（T11）— 左栏图层列表 + 双向联动 + z 序重排', () => {
   beforeEach(() => {
-    useProjectStore.setState({
-      project: createDefaultProject(),
-      undoStack: [],
-      redoStack: [],
-    });
+    useProjectStore.getState().createProject('portrait', 300);
   });
 
   it('左栏渲染 LayerPanel，elements 为空时显示空态', () => {
@@ -319,13 +311,7 @@ describe('App 自动保存 + 打开项目（T12）— 顶栏按钮 + 保存状�
     pickSavePathMock.mockReset();
     readProjectFileMock.mockReset();
     writeProjectFileMock.mockReset();
-    useProjectStore.setState({
-      project: createDefaultProject(),
-      undoStack: [],
-      redoStack: [],
-      savePath: null,
-      saveStatus: 'idle',
-    });
+    useProjectStore.getState().createProject('portrait', 300);
   });
 
   it('顶栏渲染「打开」「保存」按钮与保存状态指示', () => {
@@ -413,7 +399,7 @@ describe('App 导出盖朱红图章（T16 seam 4）— 点导出盖 Pasteup 图�
   beforeEach(() => {
     mockMatchMedia(false);
     vi.clearAllMocks();
-    useProjectStore.setState({ project: createDefaultProject(), undoStack: [], redoStack: [] });
+    useProjectStore.getState().createProject('portrait', 300);
   });
 
   afterEach(() => {
@@ -474,7 +460,7 @@ describe('App 导出盖朱红图章（T16 seam 4）— 点导出盖 Pasteup 图�
 describe('App 手帐拟物 class 结构（T16 seam 7）— 胶带/逐字/描线/手写圈注', () => {
   beforeEach(() => {
     mockMatchMedia(false);
-    useProjectStore.setState({ project: createDefaultProject(), undoStack: [], redoStack: [] });
+    useProjectStore.getState().createProject('portrait', 300);
   });
 
   afterEach(() => {
