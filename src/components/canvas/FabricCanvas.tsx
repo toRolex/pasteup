@@ -2,14 +2,17 @@
  * FabricCanvas 桥接壳（架构核心）。
  *
  * 分工铁律：Fabric 管画布内部状态，React 只管 UI 外壳，经本壳单向通信，不双向绑定。
- * - 单向向下：project 变化 → 把 elements 推送到 fabric 画布（命令式重绘）。
+ * - 单向向下：project 变化 → 经 projectRenderer 命令式同步到 fabric 画布（渲染知识收在 renderer，#47）。
  * - 单向向上：fabric 事件（object:modified）→ 显式读取对象属性回灌 onProjectChange。
  * - 不依赖 fabric `toObject()` 默认行为，schema 字段显式读写。
+ * 本壳只剩交互职责：trace 状态机 / selection 事件 / _checkTarget 命中 / object:modified 回灌 /
+ * apiRef 导航 / 工具切换；渲染同步（失效判定 / 重建 / 纹理补丁 / selection 恢复）归 projectRenderer。
  */
 import { useEffect, useRef, type MutableRefObject } from 'react';
-import { Canvas, FabricImage, Path, Pattern, Point, type FabricObject, type TPointerEventInfo } from 'fabric';
+import { Canvas, Path, Point, type FabricObject, type TPointerEventInfo } from 'fabric';
 import type { PaperProject } from '../../types/project';
-import { createFabricPath, findPaperObject, readTransform } from '../../fabric/paperBridge';
+import { findPaperObject, readTransform } from '../../fabric/paperBridge';
+import { createProjectRenderer, type ProjectRenderer } from '../../fabric/projectRenderer';
 import { HIT_TOLERANCE, hitTestElement } from '../../fabric/hitTest';
 import { pointsToOpenPath, tracePointsToPaper } from '../../fabric/traceTool';
 import { getZoom, panBy, resetViewport, zoomBy } from '../../fabric/viewport';
@@ -52,79 +55,6 @@ export interface FabricCanvasProps {
   textureLoader?: TextureLoader;
 }
 
-/** 每次 renderProject 落库的「最近一次渲染快照」，供异步纹理 resolve 时校验纸片当前仍需该纹理。 */
-interface RenderSnapshot {
-  project: PaperProject;
-}
-
-const renderSnapshot = new WeakMap<Canvas, RenderSnapshot>();
-
-/** 把 project.elements 命令式推送到 fabric 画布（单向向下）。
- *  T18：带纹理纸片先以纯色占位渲染（createFabricPath 不传 source），再经共享纹理
- *  加载器异步加载为已解码图像源后更新为 Pattern 填充；加载失败保持纯色（不抛错、
- *  不中断画布）；resolve 时校验纸片当前仍需要该纹理（防旧覆盖）。
- *  ADR 0001：pattern 不设 transform（缩放/旋转已在合成时烘焙进 dataURL）。 */
-function renderProject(canvas: Canvas, project: PaperProject, loader: TextureLoader): void {
-  canvas.clear();
-  canvas.setDimensions({ width: project.canvas.width, height: project.canvas.height });
-  renderSnapshot.set(canvas, { project });
-  for (const el of project.elements) {
-    const texture = el.textureId
-      ? project.textures.find((t) => t.id === el.textureId)
-      : undefined;
-    const path = createFabricPath(el); // 占位：无纹理源 → 纯色填充
-    canvas.add(path);
-    if (texture) {
-      void applyTextureWhenReady(canvas, el.id, texture.id, texture.dataUrl, loader);
-    }
-  }
-  applyBackground(canvas, project.bgPhoto);
-  canvas.requestRenderAll();
-}
-
-/**
- * 异步把已解码纹理源应用到当前纸片。
- * resolve 时校验：画布最近一次渲染快照里该纸片仍引用同一纹理记录（同 id 且同 dataURL），
- * 否则丢弃旧结果（快速连续编辑时旧纹理加载不覆盖新渲染）。加载失败保持纯色，不抛错。
- */
-async function applyTextureWhenReady(
-  canvas: Canvas,
-  paperId: string,
-  textureId: string,
-  dataUrl: string,
-  loader: TextureLoader,
-): Promise<void> {
-  try {
-    const source = await loader.load(dataUrl);
-    const snapshot = renderSnapshot.get(canvas);
-    const element = snapshot?.project.elements.find((el) => el.id === paperId);
-    const texture = element?.textureId
-      ? snapshot?.project.textures.find((t) => t.id === element.textureId)
-      : undefined;
-    if (!element || element.textureId !== textureId || texture?.dataUrl !== dataUrl) return;
-    const obj = findPaperObject(canvas, paperId);
-    if (!obj) return;
-    // ADR 0001 硬性契约：缩放/旋转已在合成时烘焙进位图，pattern 不设 transform
-    obj.set('fill', new Pattern({ source, repeat: 'repeat' }));
-    canvas.requestRenderAll();
-  } catch {
-    // 加载失败：保持纯色占位，不抛错、不中断画布
-  }
-}
-
-function applyBackground(canvas: Canvas, bgPhoto: PaperProject['bgPhoto']): void {
-  if (!bgPhoto) {
-    canvas.backgroundImage = undefined;
-    return;
-  }
-  if (!bgPhoto.dataUrl) return;
-  void FabricImage.fromURL(bgPhoto.dataUrl).then((image) => {
-    image.visible = bgPhoto.visible;
-    canvas.backgroundImage = image;
-    canvas.requestRenderAll();
-  });
-}
-
 /** 从 fabric 画布对象显式读回 transform，回灌成新 project（单向向上，不写回原对象）。
  *  单对象 transform 反向映射走 paperBridge.readTransform（缺字段 ?? 回落先前值）；
  *  elements 合并（join-key：elements.find(el => el.id === …)）留在本壳，不收进 paperBridge。 */
@@ -157,8 +87,8 @@ export function FabricCanvas({
 }: FabricCanvasProps) {
   const containerElRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<Canvas | null>(null);
+  const rendererRef = useRef<ProjectRenderer | null>(null);
   const projectRef = useRef(project);
-  const prevProjectRef = useRef<PaperProject | null>(null);
   const onProjectChangeRef = useRef(onProjectChange);
   const onReadyRef = useRef(onReady);
   const onSelectionChangeRef = useRef(onSelectionChange);
@@ -191,6 +121,9 @@ export function FabricCanvas({
       height: projectRef.current.canvas.height,
     });
     canvasRef.current = canvas;
+    // 渲染同步收进有状态 renderer（#47）：构造注入共享 loader；renderer 生命周期与 canvas 绑定
+    // （仅 mount 创建 / unmount dispose，重复创建会丢 prev）。
+    rendererRef.current = createProjectRenderer(canvas, textureLoaderRef.current);
 
     // T6 自定义命中：覆写 fabric 私有 _checkTarget（唯一对象命中判定点，被
     // _searchPossibleTargets 调用）。select 模式按纸片实际轮廓（isPointInPath 纯几何等价）
@@ -221,7 +154,7 @@ export function FabricCanvas({
     });
 
     // T10 选中联动（fabric → React 单向事件）：选中/切换/清空时上报当前选中纸片 id。
-    // renderProject 重建对象时 fabric 会先 discardActiveObject（selection:cleared）再
+    // renderer 全量重建对象时 fabric 会先 discardActiveObject（selection:cleared）再
     // setActiveObject（selection:created），React 18 批处理下最终状态仍为被恢复纸片。
     const emitSelection = () => {
       const active = canvas.getActiveObject();
@@ -309,7 +242,9 @@ export function FabricCanvas({
 
     return () => {
       if (targetApiRef) targetApiRef.current = null;
-      canvas.dispose();
+      rendererRef.current?.dispose(); // dispose 只清 renderer 内部状态
+      rendererRef.current = null;
+      canvas.dispose(); // canvas 生命周期仍归壳
       canvasRef.current = null;
     };
     // 仅挂载时执行一次；fabric 画布生命周期由本壳持有
@@ -325,40 +260,10 @@ export function FabricCanvas({
     canvas.defaultCursor = isTrace ? 'crosshair' : 'default';
   }, [activeTool]);
 
-  // 单向向下：project 变化时推送 elements 到画布。
-  // renderProject 会 clear 重建对象，导致选中丢失；这里在重建后按 paperId 命令式恢复
-  // activeObject（React→fabric 单向命令式，不引入双向绑定）。
-  // bgPhoto 分支只切可见性，不动元素——但仅当本次变化确实是「纯底图 visible 切换」才走
-  // 快速路径；undo/redo 恢复、描摹/变换回灌等会改 elements 的，必须全量 renderProject，
-  // 否则画布与 store 脱节（例如有底图时撤销纸片移动不会重绘）。
+  // 单向向下：project 变化时同步到画布。渲染知识（失效判定三态 / 全量重建 / 底图可见性 /
+  // 异步纹理补丁 / selection 恢复）全部收进 projectRenderer（#47），壳只转发一句 render。
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const prev = prevProjectRef.current;
-    prevProjectRef.current = project;
-    // 首帧（prev === null）与 elements/textures/canvas 引用或底图 dataUrl 变化 → 全量重绘
-    const bgOnlyChange =
-      prev !== null &&
-      project.elements === prev.elements &&
-      project.textures === prev.textures &&
-      project.canvas === prev.canvas &&
-      project.bgPhoto?.dataUrl === prev.bgPhoto?.dataUrl;
-    if (bgOnlyChange) {
-      if (canvas.backgroundImage && project.bgPhoto) {
-        canvas.backgroundImage.visible = project.bgPhoto.visible;
-        canvas.requestRenderAll();
-      }
-      return;
-    }
-    const activePaperId = canvas.getActiveObject()?.paperId;
-    renderProject(canvas, project, textureLoaderRef.current);
-    if (activePaperId) {
-      const restored = findPaperObject(canvas, activePaperId);
-      if (restored) {
-        canvas.setActiveObject(restored);
-        canvas.requestRenderAll();
-      }
-    }
+    rendererRef.current?.render(project);
   }, [project]);
 
   return <div ref={containerElRef} data-testid="fabric-canvas" />;

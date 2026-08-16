@@ -2,7 +2,7 @@
  * T18-b 属性面板 → 画布实时渲染集成测试（主 seam）。
  *
  * 链路：属性面板按钮 → propertyEdit 不可变重合成（mock tintCache 廉价 dataURL）→
- * commitProject（写撤销栈）→ store project 变化 → FabricCanvas renderProject →
+ * commitProject（写撤销栈）→ store project 变化 → FabricCanvas → projectRenderer →
  * 共享纹理加载器异步加载 → Pattern 更新。走真实 store（Zustand），RTL 渲染
  * FabricCanvas + PropertyPanel 两个组件。
  *
@@ -10,7 +10,7 @@
  * 1. 切 6 种纹理风格任一 → 画布纸片 pattern 源更新为对应新 dataURL 解码源
  * 2. 调色 / 缩放 / 旋转 → 纹理重合成新 dataURL → 画布 pattern 更新
  * 3. undo / redo 纹理属性变更 → 画布渲染与 store project 一致
- * 4. 快速连续 undo/redo（异步加载中）→ 不出现旧状态覆盖（renderSnapshot 防旧覆盖）
+ * 4. 快速连续 undo/redo（异步加载中）→ 不出现旧状态覆盖（projectRenderer 内部快照防旧覆盖）
  * 5. 关闭纹理（点「无」）→ 纸片恢复纯色填充（无 pattern）
  */
 import { describe, expect, it, vi, beforeEach } from 'vitest';

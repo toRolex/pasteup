@@ -3,6 +3,7 @@ import {
   createEmptyProject,
   createPaperElement,
   createPaperTexture,
+  diffProject,
   parseProject,
   serializeProject,
   type PaperProject,
@@ -342,5 +343,79 @@ describe('主 seam（T12）：完整项目 serialize → parse 深度一致', ()
     expect(() => parseProject('not json')).toThrow();
     expect(() => parseProject('12345')).toThrow();
     expect(() => parseProject('{"version":1}')).toThrow(); // 缺字段也应在严格解析下暴露（当前实现 JSON.parse 后直接返回，字段缺失不抛）
+  });
+});
+
+describe('diffProject（schema 层失效判定三态单点化，#47）', () => {
+  // core = elements / textures / canvas（引用相等）；bgPhoto 按 dataUrl 比较（含 null 边界）。
+  function baseProject(): PaperProject {
+    const p = createEmptyProject(1200, 800);
+    p.elements.push(createPaperElement({ path: 'M 0 0 L 10 0 L 5 10 Z', color: '#c0392b' }));
+    return p;
+  }
+
+  it('同一引用 → none', () => {
+    const prev = baseProject();
+    expect(diffProject(prev, prev)).toBe('none');
+  });
+
+  it('四引用全相等（浅拷贝）→ none', () => {
+    const prev = baseProject();
+    const next = { ...prev }; // elements/textures/canvas/bgPhoto 引用全等
+    expect(diffProject(prev, next)).toBe('none');
+  });
+
+  it('core 相等 + bgPhoto 两侧均 null（null === null 引用相等）→ none', () => {
+    const prev = baseProject(); // bgPhoto: null
+    const next = { ...prev, bgPhoto: null };
+    expect(diffProject(prev, next)).toBe('none');
+  });
+
+  it('core 相等 + bgPhoto 引用不同但 dataUrl 相同（visible 翻转）→ bg-only', () => {
+    const prev: PaperProject = { ...baseProject(), bgPhoto: { dataUrl: 'data:x', visible: true } };
+    const next: PaperProject = { ...prev, bgPhoto: { dataUrl: 'data:x', visible: false } };
+    expect(diffProject(prev, next)).toBe('bg-only');
+  });
+
+  it('core 相等 + bgPhoto dataUrl 两侧均 null（visible 翻转，null 边界）→ bg-only', () => {
+    const prev: PaperProject = { ...baseProject(), bgPhoto: { dataUrl: null, visible: true } };
+    const next: PaperProject = { ...prev, bgPhoto: { dataUrl: null, visible: false } };
+    expect(diffProject(prev, next)).toBe('bg-only');
+  });
+
+  it('core 相等 + bgPhoto dataUrl 不同 → full', () => {
+    const prev: PaperProject = { ...baseProject(), bgPhoto: { dataUrl: 'data:a', visible: true } };
+    const next: PaperProject = { ...prev, bgPhoto: { dataUrl: 'data:b', visible: true } };
+    expect(diffProject(prev, next)).toBe('full');
+  });
+
+  it('core 相等 + bgPhoto 从 null 到有（新增底图，null 边界）→ full', () => {
+    const prev = baseProject(); // bgPhoto: null
+    const next: PaperProject = { ...prev, bgPhoto: { dataUrl: 'data:x', visible: true } };
+    expect(diffProject(prev, next)).toBe('full');
+  });
+
+  it('core 相等 + bgPhoto 从有到 null（移除底图，null 边界）→ full', () => {
+    const prev: PaperProject = { ...baseProject(), bgPhoto: { dataUrl: 'data:x', visible: true } };
+    const next: PaperProject = { ...prev, bgPhoto: null };
+    expect(diffProject(prev, next)).toBe('full');
+  });
+
+  it('elements 引用变化 → full', () => {
+    const prev = baseProject();
+    const next = { ...prev, elements: [...prev.elements] };
+    expect(diffProject(prev, next)).toBe('full');
+  });
+
+  it('textures 引用变化 → full', () => {
+    const prev = baseProject();
+    const next = { ...prev, textures: [...prev.textures] };
+    expect(diffProject(prev, next)).toBe('full');
+  });
+
+  it('canvas 引用变化 → full', () => {
+    const prev = baseProject();
+    const next = { ...prev, canvas: { ...prev.canvas } };
+    expect(diffProject(prev, next)).toBe('full');
   });
 });

@@ -12,6 +12,7 @@ import {
   createEmptyProject,
   createPaperElement,
   DEFAULT_PAPER_COLOR,
+  diffProject,
   type PaperProject,
 } from '../types/project';
 import { moveDown, moveToBottom, moveToTop, moveUp } from './layerOps';
@@ -100,23 +101,16 @@ function snapshotProject(project: PaperProject): PaperProject {
 
 /**
  * 统一编辑提交：push 编辑前快照到 undoStack、清空 redoStack（栈顶变更）、替换 project。
- * 传同一对象引用视为 no-op（避免回灌空提交）。
- * elements 数组引用未变 → 也视为 no-op（T11 layerOps 边界 no-op：用户操作已到达目标位置，
- * 例如已在末尾再调 moveToTop → 不应入撤销栈）。
+ * 失效判定单点化（#47）：走 schema 层 diffProject，`'none'`（core+bgPhoto 四引用全相等）→
+ * no-op 不入栈（避免回灌空提交；T11 layerOps 边界 no-op 返回同引用也经此识别，例如已在末尾
+ * 再调 moveToTop）。`'bg-only'`（仅底图 visible 翻转）≠ `'none'`，仍入撤销栈。
  */
 function commitEdit(
   state: ProjectStore,
   next: PaperProject,
 ): Partial<ProjectStore> {
   if (state.project === next) return {};
-  if (
-    state.project.elements === next.elements &&
-    state.project.canvas === next.canvas &&
-    state.project.bgPhoto === next.bgPhoto &&
-    state.project.textures === next.textures
-  ) {
-    return {};
-  }
+  if (diffProject(state.project, next) === 'none') return {};
   return {
     project: next,
     undoStack: [...state.undoStack, snapshotProject(state.project)],

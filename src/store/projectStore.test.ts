@@ -236,6 +236,26 @@ describe('projectStore（T9 seam U1–U6）— 撤销/重做栈', () => {
     expect(useProjectStore.getState().project.elements).toHaveLength(0);
   });
 
+  it('commitProject 传四引用全相等的浅拷贝（diffProject none）→ no-op 不入撤销栈（#47 连线）', () => {
+    const before = useProjectStore.getState().project;
+    const undoLenBefore = useProjectStore.getState().undoStack.length;
+    // 顶层换新对象但 elements/textures/canvas/bgPhoto 引用全等 → 无实质变更
+    useProjectStore.getState().commitProject({ ...before });
+    expect(useProjectStore.getState().undoStack.length).toBe(undoLenBefore);
+    expect(useProjectStore.getState().project).toBe(before); // no-op：未替换
+  });
+
+  it('底图 visible 翻转（diffProject bg-only）仍入撤销栈（bg-only ≠ none，不合并成单一 bool）', () => {
+    const s = useProjectStore.getState();
+    s.setBackgroundPhoto('data:image/png;base64,AA');
+    const undoLenBefore = useProjectStore.getState().undoStack.length;
+
+    s.toggleBackgroundPhoto(); // core 引用不变、bgPhoto 换新同 dataUrl → bg-only
+    const st = useProjectStore.getState();
+    expect(st.project.bgPhoto?.visible).toBe(false);
+    expect(st.undoStack.length).toBe(undoLenBefore + 1); // bg-only 入撤销栈（store 只看 none）
+  });
+
   it('快照隔离：undo 后继续编辑不污染已 undo 状态（redo 清空 + 栈内快照独立）', () => {
     const s = useProjectStore.getState();
     s.addPaper('M 0 0 L 1 0 L 0 1 Z'); // A：1 纸片

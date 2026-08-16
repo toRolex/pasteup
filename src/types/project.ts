@@ -101,6 +101,31 @@ export function createEmptyProject(width: number, height: number): PaperProject 
   };
 }
 
+/**
+ * 渲染失效三态（#47）：schema 层单点化的失效判定，替代散落的「prev 引用比较」手工知识。
+ * core（elements/textures/canvas）按引用相等比较；bgPhoto 按 dataUrl 比较（含 null 边界）。
+ * 各消费者取所需语义：store 只看 `'none'`（commitEdit 不入撤销栈）；renderer 消费三态。
+ */
+export type ProjectDiff = 'none' | 'bg-only' | 'full';
+
+/**
+ * 比较前后两版 project，判定渲染失效路径。
+ * - `'none'`：core + bgPhoto 四引用全相等 → 无实质变化（renderer 不重绘，commitEdit 不入栈）。
+ * - `'bg-only'`：core 相等 + bgPhoto 引用不同但 dataUrl 相同（唯一可能变化是 visible）
+ *   → renderer 只切 `backgroundImage.visible`，不重建元素。
+ * - `'full'`：其余（core 引用变化 / bgPhoto dataUrl 变化 / 底图增删）→ 全量重建。
+ */
+export function diffProject(prev: PaperProject, next: PaperProject): ProjectDiff {
+  const coreEqual =
+    prev.elements === next.elements &&
+    prev.textures === next.textures &&
+    prev.canvas === next.canvas;
+  if (!coreEqual) return 'full';
+  if (prev.bgPhoto === next.bgPhoto) return 'none';
+  // bgPhoto 引用不同：dataUrl 相等则唯一可能变化是 visible → bg-only；否则（增删/换图）全量。
+  return prev.bgPhoto?.dataUrl === next.bgPhoto?.dataUrl ? 'bg-only' : 'full';
+}
+
 function uid(): string {
   const c = globalThis.crypto;
   if (c && typeof c.randomUUID === 'function') return c.randomUUID();

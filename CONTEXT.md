@@ -13,6 +13,7 @@
 - **描摹（trace）**：在底图上画轮廓的行为；MVP 用自由描绘，点取贴合后置。
 - **拼贴（collage）**：对纸片做变换、图层排序、排版的最终成品状态。
 - **paperBridge**：schema↔fabric 双向映射收拢的 module（`src/fabric/paperBridge.ts`）。正向 `paperToFabricOptions` 纯映射 + `createFabricPath` 构造（含质感）、反向 `readTransform` 单对象 transform 回灌（缺字段 ?? 回落）、paperId 经 `declare module 'fabric'` 声明合并承载（读写类型安全、无强转）、`findPaperObject` 为 fabric 侧按 paperId 定位的唯一 seam。新增 transform 字段只改这一处。
+- **渲染（projectRenderer）**：渲染同步有状态 module（`src/fabric/projectRenderer.ts`），把「project → fabric 画布」的渲染知识从 React 壳收拢（壳只剩交互职责）。interface `createProjectRenderer(canvas, loader) → { render, dispose }`：render 内部走 schema 层 `diffProject(prev, next)` 三态（`'none'` 不重绘 / `'bg-only'` 只切底图 `backgroundImage.visible` 不重建元素 / `'full'` 全量重建），selection 跨重建按 paperId 恢复，异步纹理补丁（纯色占位 → 解码 → Pattern）校验内部渲染快照防旧覆盖。prev/失效/快照收进 implementation（depth），壳的 useEffect 变薄为一句 `renderer.render(project)`；loader 构造注入（TextureLoader seam：prod 单例 / test fake 两 adapter）；dispose 只清内部状态，canvas 生命周期归壳。失效判定单点化在 schema 层 `diffProject`（`src/types/project.ts`）：store 只看 `'none'`（commitEdit 不入撤销栈），renderer 消费三态。
 
 ## 关键技术决策
 
