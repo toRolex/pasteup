@@ -15,7 +15,7 @@ import { JournalShell } from './styles/journalLayout';
 import { useProjectStore, type SaveStatus } from './store/projectStore';
 import { useToolStore } from './store/toolStore';
 import { exportProjectToSVG, saveSvgFile } from './export/svg';
-import { createAutosaveController } from './io/autosave';
+import { createProjectPersistence } from './io/projectPersistence';
 import { pickOpenPath, pickSavePath, readProjectFile, writeProjectFile } from './io/projectFile';
 
 /** 自动保存状态 → 顶栏指示文案（T12）。 */
@@ -35,11 +35,10 @@ export default function App() {
   const toggleBackgroundPhoto = useProjectStore((s) => s.toggleBackgroundPhoto);
   const reorderElements = useProjectStore((s) => s.reorderElements);
   const saveStatus = useProjectStore((s) => s.saveStatus);
-  const openProject = useProjectStore((s) => s.openProject);
   const elements = project.elements;
   const bgPhoto = project.bgPhoto;
   const apiRef = useRef<FabricCanvasApi | null>(null);
-  const autosaveRef = useRef<ReturnType<typeof createAutosaveController> | null>(null);
+  const persistenceRef = useRef<ReturnType<typeof createProjectPersistence> | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
   const { activate: activatePicker } = useScreenPicker();
@@ -50,26 +49,37 @@ export default function App() {
   // T16 导出图章：点导出盖朱红「Pasteup」图章（CSS 动效，reduced-motion 瞬时）。
   const [stamped, setStamped] = useState(false);
 
-  // T12 无感自动保存：订阅 store 项目变化 → 防抖写盘（首次保存弹位置选择）。
-  // 控制器与写盘逻辑在 io/autosave.ts（纯逻辑、依赖注入），这里只做接线。
+  // T12 无感自动保存 + 打开：收拢进 projectPersistence（#60），这里只剩三行接线——
+  // 建实例（store/file 两个窄 adapter 投影既有 store 与 io 导出）、订阅 → schedule、卸载 dispose。
+  // 防抖/首存弹位置/in-flight 补写/flush 编排在 io/autosave.ts，打开编排在 io/projectPersistence.ts。
   useEffect(() => {
-    const controller = createAutosaveController({
-      getProject: () => useProjectStore.getState().project,
-      getSavePath: () => useProjectStore.getState().savePath,
-      onSavePath: (path) => useProjectStore.getState().setSavePath(path),
-      onSaveStatus: (status) => useProjectStore.getState().setSaveStatus(status),
-      pickSavePath,
-      writeProjectFile,
+    const persistence = createProjectPersistence({
+      store: {
+        getProject: () => useProjectStore.getState().project,
+        getSavePath: () => useProjectStore.getState().savePath,
+        setSavePath: (path) => useProjectStore.getState().setSavePath(path),
+        setSaveStatus: (status) => useProjectStore.getState().setSaveStatus(status),
+        open: (project, path) => useProjectStore.getState().openProject(project, path),
+      },
+      file: {
+        pickSavePath,
+        pickOpenPath,
+        writeProjectFile,
+        readProjectFile,
+      },
     });
-    autosaveRef.current = controller;
+    persistenceRef.current = persistence;
     const unsubscribe = useProjectStore.subscribe((state, prev) => {
-      // 只对 project 变化触发（saveStatus/savePath 变化不重复写盘）
-      if (state.project !== prev.project) controller.schedule();
+      // 只对 project 变化触发（saveStatus/savePath 变化不重复写盘）。
+      // 打开项目（openProject 替换 project）会触发 schedule → 500ms 后一次无害写回
+      // （内容=磁盘内容，非污染；顺带把打开前 saveStatus='error' 刷新为 saved）。
+      // 属预期行为（T12 / #52 Q5），不抑制。
+      if (state.project !== prev.project) persistence.schedule();
     });
     return () => {
       unsubscribe();
-      controller.dispose();
-      autosaveRef.current = null;
+      persistence.dispose();
+      persistenceRef.current = null;
     };
   }, []);
 
@@ -101,21 +111,18 @@ export default function App() {
     setStamped(true);
   };
 
-  // T12 手动「保存」：立即触发自动保存写盘（无视防抖；首次保存仍弹位置选择）。
+  // T12 手动「保存」：projectPersistence.save() 即原 flush 语义（立即写盘无视防抖；首次仍弹位置）。
   const handleSave = () => {
     setFileError(null);
-    void autosaveRef.current?.flush();
+    void persistenceRef.current?.save();
   };
 
-  // T12 「打开」：文件对话框选 .json → 读取解析 → 写入 store（新历史起点）。
-  // 文件读取/解析失败显示错误，不崩溃。
+  // T12 「打开」：编排收拢进 projectPersistence.open()（选文件 → 读取 → store.open）。
+  // reject 传播到壳：catch 设瞬态 fileError（React state，顶栏展示）；成功/取消 resolve 后清除。
   const handleOpen = async () => {
-    const path = await pickOpenPath();
-    if (!path) return;
     try {
-      const opened = await readProjectFile(path);
+      await persistenceRef.current?.open();
       setFileError(null);
-      openProject(opened, path);
     } catch (err) {
       setFileError(err instanceof Error ? err.message : '打开项目失败');
     }

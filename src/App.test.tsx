@@ -2,11 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import App from './App';
 import { tokens } from './styles/tokens';
-import { createEmptyProject, createPaperElement } from './types/project';
-import {
-  createDefaultProject,
-  useProjectStore,
-} from './store/projectStore';
+import { createDefaultProject, useProjectStore } from './store/projectStore';
 import { DEFAULT_TOOL, useToolStore } from './store/toolStore';
 
 const exportProjectToSVGMock = vi.hoisted(() => vi.fn());
@@ -16,30 +12,22 @@ vi.mock('./export/svg', () => ({
   saveSvgFile: saveSvgFileMock,
 }));
 
-// T12 — 自动保存控制器 + 项目文件 I/O 封装 mock（App 层只验接线，防抖/写盘逻辑在 io 单测覆盖）
-const createAutosaveControllerMock = vi.hoisted(() => vi.fn());
+// T12 — projectPersistence module mock（App 层只验接线：建实例、订阅→schedule、按钮→save/open）。
+// 防抖/首存弹位置/open 编排在 io 单测覆盖（autosave.test / projectPersistence.test）。
+const createProjectPersistenceMock = vi.hoisted(() => vi.fn());
 const scheduleMock = vi.hoisted(() => vi.fn());
-const flushMock = vi.hoisted(() => vi.fn());
+const saveMock = vi.hoisted(() => vi.fn());
+const openMock = vi.hoisted(() => vi.fn());
 const disposeMock = vi.hoisted(() => vi.fn());
-vi.mock('./io/autosave', () => ({
-  createAutosaveController: createAutosaveControllerMock,
+vi.mock('./io/projectPersistence', () => ({
+  createProjectPersistence: createProjectPersistenceMock,
 }));
-// 默认返回有效控制器（App 挂载 useEffect 立即创建；unmount 时调用 dispose 不能为 undefined）
-createAutosaveControllerMock.mockImplementation(() => ({
+// 默认返回有效实例（App 挂载 useEffect 立即创建；unmount 时调用 dispose 不能为 undefined）
+createProjectPersistenceMock.mockImplementation(() => ({
   schedule: scheduleMock,
-  flush: flushMock,
+  save: saveMock,
+  open: openMock,
   dispose: disposeMock,
-}));
-
-const pickOpenPathMock = vi.hoisted(() => vi.fn());
-const pickSavePathMock = vi.hoisted(() => vi.fn());
-const readProjectFileMock = vi.hoisted(() => vi.fn());
-const writeProjectFileMock = vi.hoisted(() => vi.fn());
-vi.mock('./io/projectFile', () => ({
-  pickOpenPath: pickOpenPathMock,
-  pickSavePath: pickSavePathMock,
-  readProjectFile: readProjectFileMock,
-  writeProjectFile: writeProjectFileMock,
 }));
 
 const normalize = (s: string) => s.replace(/\s+/g, '');
@@ -310,14 +298,11 @@ describe('App 图层面板（T11）— 左栏图层列表 + 双向联动 + z 序
 describe('App 自动保存 + 打开项目（T12）— 顶栏按钮 + 保存状态 + store 接线', () => {
   beforeEach(() => {
     // mockClear 保留默认实现（App 挂载即 create + unmount 即 dispose），只清调用记录
-    createAutosaveControllerMock.mockClear();
+    createProjectPersistenceMock.mockClear();
     scheduleMock.mockReset();
-    flushMock.mockReset();
+    saveMock.mockReset();
+    openMock.mockReset();
     disposeMock.mockReset();
-    pickOpenPathMock.mockReset();
-    pickSavePathMock.mockReset();
-    readProjectFileMock.mockReset();
-    writeProjectFileMock.mockReset();
     useProjectStore.getState().createProject('portrait', 300);
   });
 
@@ -336,10 +321,10 @@ describe('App 自动保存 + 打开项目（T12）— 顶栏按钮 + 保存状�
     await waitFor(() => expect(scheduleMock).toHaveBeenCalledTimes(1));
   });
 
-  it('点击「保存」→ 触发 controller.flush（立即写盘）', async () => {
+  it('点击「保存」→ 触发 persistence.save（立即写盘）', async () => {
     render(<App />);
     fireEvent.click(screen.getByTestId('save-project'));
-    await waitFor(() => expect(flushMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
   });
 
   it('保存状态指示：idle=未保存 / saving=保存中 / saved=已保存 / error=保存失败', () => {
@@ -356,47 +341,45 @@ describe('App 自动保存 + 打开项目（T12）— 顶栏按钮 + 保存状�
     expect(screen.getByTestId('save-status')).toHaveTextContent('保存失败');
   });
 
-  it('点击「打开」→ 对话框选文件 → 读取解析 → 写入 store（project/savePath/saveStatus）', async () => {
-    pickOpenPathMock.mockResolvedValue('/tmp/project.json');
-    const opened = createEmptyProject(500, 400);
-    opened.elements.push(
-      createPaperElement({ id: 'restored', path: 'M 0 0 Z', color: '#000', seed: 9 }),
-    );
-    readProjectFileMock.mockResolvedValue(opened);
-
+  it('创建实例时投影 store/file 两个窄 adapter（App 组装投影既有 store 与 io 导出）', () => {
     render(<App />);
-    fireEvent.click(screen.getByTestId('open-project'));
-
-    await waitFor(() => {
-      const st = useProjectStore.getState();
-      expect(st.project).toEqual(opened);
-      expect(st.savePath).toBe('/tmp/project.json');
-      expect(st.saveStatus).toBe('saved');
-    });
-    expect(pickOpenPathMock).toHaveBeenCalledTimes(1);
-    expect(readProjectFileMock).toHaveBeenCalledWith('/tmp/project.json');
+    expect(createProjectPersistenceMock).toHaveBeenCalledTimes(1);
+    const deps = createProjectPersistenceMock.mock.calls[0]![0];
+    expect(typeof deps.store.getProject).toBe('function');
+    expect(typeof deps.store.getSavePath).toBe('function');
+    expect(typeof deps.store.setSavePath).toBe('function');
+    expect(typeof deps.store.setSaveStatus).toBe('function');
+    expect(typeof deps.store.open).toBe('function');
+    expect(typeof deps.file.pickSavePath).toBe('function');
+    expect(typeof deps.file.pickOpenPath).toBe('function');
+    expect(typeof deps.file.writeProjectFile).toBe('function');
+    expect(typeof deps.file.readProjectFile).toBe('function');
   });
 
-  it('「打开」用户取消 → 不读取、项目不变', async () => {
-    pickOpenPathMock.mockResolvedValue(null);
+  it('点击「打开」→ 调用 persistence.open（编排在 io/projectPersistence.test 覆盖）', async () => {
     render(<App />);
     fireEvent.click(screen.getByTestId('open-project'));
-
-    await waitFor(() => expect(pickOpenPathMock).toHaveBeenCalledTimes(1));
-    expect(readProjectFileMock).not.toHaveBeenCalled();
-    expect(useProjectStore.getState().project).toEqual(createDefaultProject());
+    await waitFor(() => expect(openMock).toHaveBeenCalledTimes(1));
   });
 
-  it('「打开」文件损坏/解析失败 → 显示错误、不崩溃、项目不变', async () => {
-    pickOpenPathMock.mockResolvedValue('/tmp/project.json');
-    readProjectFileMock.mockRejectedValue(new Error('项目文件损坏'));
-
+  it('「打开」reject → 壳 catch 设瞬态 fileError（React state，顶栏展示），不崩溃', async () => {
+    openMock.mockRejectedValue(new Error('项目文件损坏'));
     render(<App />);
     fireEvent.click(screen.getByTestId('open-project'));
 
     await waitFor(() => expect(screen.getByTestId('open-error')).toHaveTextContent(/项目文件损坏/));
     expect(useProjectStore.getState().project).toEqual(createDefaultProject());
-    expect(useProjectStore.getState().savePath).toBeNull();
+  });
+
+  it('「打开」resolve（成功/取消）→ 清除上次错误（fileError 是瞬态）', async () => {
+    openMock.mockRejectedValueOnce(new Error('上次打开失败'));
+    render(<App />);
+    fireEvent.click(screen.getByTestId('open-project'));
+    await waitFor(() => expect(screen.getByTestId('open-error')).toHaveTextContent('上次打开失败'));
+
+    openMock.mockResolvedValue(undefined);
+    fireEvent.click(screen.getByTestId('open-project'));
+    await waitFor(() => expect(screen.queryByTestId('open-error')).toBeNull());
   });
 });
 
@@ -411,7 +394,7 @@ describe('App 导出盖朱红图章（T16 seam 4）— 点导出盖 Pasteup 图�
 
   afterEach(() => {
     // 只复原 matchMedia；不能用 vi.restoreAllMocks()——它会清掉文件级 T12
-    // createAutosaveController mock 的实现，导致后续 App 渲染时 controller.dispose 崩溃。
+    // createProjectPersistence mock 的实现，导致后续 App 渲染时 persistence.dispose 崩溃。
     (window as unknown as { matchMedia?: unknown }).matchMedia = undefined;
   });
 
@@ -471,7 +454,7 @@ describe('App 手帐拟物 class 结构（T16 seam 7）— 胶带/逐字/描线/
   });
 
   afterEach(() => {
-    // 只复原 matchMedia；不能 vi.restoreAllMocks()（会清掉文件级 T12 autosave mock 实现）
+    // 只复原 matchMedia；不能 vi.restoreAllMocks()（会清掉文件级 T12 projectPersistence mock 实现）
     (window as unknown as { matchMedia?: unknown }).matchMedia = undefined;
   });
 
