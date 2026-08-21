@@ -9,14 +9,14 @@
  * object:modified 回灌 / apiRef 导航 / 工具切换；渲染同步（失效判定 / 重建 / 纹理补丁 /
  * selection 恢复）归 projectRenderer。
  */
-import { useEffect, useRef, type MutableRefObject } from 'react';
+import { useCallback, useEffect, useRef, type MutableRefObject } from 'react';
 import { Canvas, Path, Point, type FabricObject, type TPointerEventInfo } from 'fabric';
 import type { PaperProject } from '../../types/project';
 import { findPaperObject, readTransform } from '../../fabric/paperBridge';
 import { createProjectRenderer, type ProjectRenderer } from '../../fabric/projectRenderer';
 import { HIT_TOLERANCE, hitTestElement } from '../../fabric/hitTest';
 import { pointsToOpenPath, tracePointsToPaper } from '../../fabric/traceTool';
-import { getZoom, panBy, resetViewport, zoomBy } from '../../fabric/viewport';
+import { getZoom, fitToViewport, panBy, zoomBy } from '../../fabric/viewport';
 import { textureSupply, type TextureLoadSide } from '../../texture/supply';
 import { useToolStore } from '../../store/toolStore';
 
@@ -30,7 +30,7 @@ export interface FabricCanvasApi {
   zoomBy(factor: number): number;
   /** 视口平移 dx/dy 像素。 */
   panBy(dx: number, dy: number): void;
-  /** 复位视口：缩放 1、位移 0。 */
+  /** 复位视口：回到 fit-to-viewport（整张纸可见、居中）。 */
   resetViewport(): void;
   /** 当前视口缩放。 */
   getZoom(): number;
@@ -101,6 +101,20 @@ export function FabricCanvas({
   activeToolRef.current = tool;
   textureLoaderRef.current = textureLoader;
 
+  // 视口适配（viewport fit）：DOM 尺寸=容器尺寸 + viewportTransform 设 fit 居中矩阵。
+  // 世界坐标始终是 project.canvas 尺寸；fit 不经 setZoom 钳制（见 computeFitZoom）。
+  // 布局读统一 clientWidth/clientHeight；零尺寸守卫（jsdom 无布局）保留。
+  const applyFit = useCallback(() => {
+    const canvas = canvasRef.current;
+    const container = containerElRef.current;
+    if (!canvas || !container) return;
+    const w = container.clientWidth;
+    const h = container.clientHeight;
+    if (w <= 0 || h <= 0) return;
+    fitToViewport(canvas, { width: w, height: h }, projectRef.current.canvas);
+    canvas.requestRenderAll();
+  }, []);
+
   // 挂载：创建 fabric 画布并订阅事件（fabric 拥有画布内部状态）。
   // fabric v7 会把传入的 <canvas> 包进自建 wrapper，因此 React 只持有容器 div，
   // canvas 元素由本壳命令式创建，避免 React 虚拟 DOM 与 fabric 实际 DOM 布局脱节。
@@ -114,7 +128,31 @@ export function FabricCanvas({
       width: projectRef.current.canvas.width,
       height: projectRef.current.canvas.height,
     });
+    // fabric v7 构造时会在自建 wrapper 内新建 lower-canvas 而不复用传入元素，
+    // 传入的 canvasEl 成为孤儿以 inline 留在容器里占位全尺寸，
+    // 把 wrapper 推出视口（画布脱离视口 bug 的真正根因）——清掉。
+    // StrictMode 双挂载下 dispose 的 cleanupDOM 会把 canvasEl 恢复回原 parent，
+    // 孤儿再现，故卸载 cleanup 亦调本函数兜底。
+    const detachOrphanCanvas = () => {
+      if (canvasEl.parentElement === container) container.removeChild(canvasEl);
+    };
+    detachOrphanCanvas();
     canvasRef.current = canvas;
+
+    // 创建后立即 fit 一次（防首帧闪全尺寸画布，有意为之）；此后由 RO 跟随容器变化。
+    applyFit();
+
+    // ResizeObserver 跟随容器：回调先对比尺寸，相同 early-return
+    // （setDimensions 会改 wrapper 触发 RO，不守卫会自激循环）。zoom 重置为 fitScale。
+    let lastW = container.clientWidth;
+    let lastH = container.clientHeight;
+    const ro = new ResizeObserver(() => {
+      if (container.clientWidth === lastW && container.clientHeight === lastH) return;
+      lastW = container.clientWidth;
+      lastH = container.clientHeight;
+      applyFit();
+    });
+    ro.observe(container);
     // 渲染同步收进有状态 renderer（#47）：构造注入共享 loader；renderer 生命周期与 canvas 绑定
     // （仅 mount 创建 / unmount dispose，重复创建会丢 prev）。
     rendererRef.current = createProjectRenderer(canvas, textureLoaderRef.current);
@@ -221,7 +259,7 @@ export function FabricCanvas({
       targetApiRef.current = {
         zoomBy: (factor) => zoomBy(canvas, factor),
         panBy: (dx, dy) => panBy(canvas, dx, dy),
-        resetViewport: () => resetViewport(canvas),
+        resetViewport: () => applyFit(),
         getZoom: () => getZoom(canvas),
         setActiveObject: (paperId) => {
           const target = findPaperObject(canvas, paperId);
@@ -234,13 +272,15 @@ export function FabricCanvas({
 
     return () => {
       if (targetApiRef) targetApiRef.current = null;
+      ro.disconnect();
       rendererRef.current?.dispose(); // dispose 只清 renderer 内部状态
       rendererRef.current = null;
       canvas.dispose(); // canvas 生命周期仍归壳
+      detachOrphanCanvas();
       canvasRef.current = null;
     };
     // 仅挂载时执行一次；fabric 画布生命周期由本壳持有
-  }, []);
+  }, [applyFit]);
 
   // 工具切换：trace 模式关闭对象选择（不选中既有纸片），光标改十字准星。
   useEffect(() => {
@@ -274,6 +314,11 @@ export function FabricCanvas({
   useEffect(() => {
     rendererRef.current?.render(project);
   }, [project]);
+
+  // project.canvas 尺寸变化（新建项目换朝向/分辨率）：世界变了，重算 fit。
+  useEffect(() => {
+    applyFit();
+  }, [project.canvas.width, project.canvas.height, applyFit]);
 
   return <div ref={containerElRef} data-testid="fabric-canvas" />;
 }

@@ -107,20 +107,27 @@ describe('FabricCanvas 导航 API（seam S5）— apiRef 只改视口不动元�
     const before = { left: obj.left, top: obj.top, scaleX: obj.scaleX, scaleY: obj.scaleY };
 
     expect(apiRef.current!.zoomBy(2)).toBe(2);
-    expect(canvas!.viewportTransform[0]).toBe(2);
+    // zoomBy 锚视口中心（zoomToPoint）：缩放项=2，位移项 = 中心 - 世界中心×2
+    const vptAfterZoom = canvas!.viewportTransform;
+    expect(vptAfterZoom[0]).toBe(2);
+    expect(vptAfterZoom[3]).toBe(2);
     expect(obj.left).toBe(before.left);
     expect(obj.top).toBe(before.top);
     expect(obj.scaleX).toBe(before.scaleX);
     expect(obj.scaleY).toBe(before.scaleY);
 
     apiRef.current!.panBy(50, 30);
-    expect(canvas!.viewportTransform[4]).toBe(50);
-    expect(canvas!.viewportTransform[5]).toBe(30);
+    const vptBeforePan = canvas!.viewportTransform;
+    expect(vptBeforePan[4]).toBeCloseTo(vptAfterZoom[4] + 50);
+    expect(vptBeforePan[5]).toBeCloseTo(vptAfterZoom[5] + 30);
     expect(obj.left).toBe(before.left);
     expect(obj.top).toBe(before.top);
 
+    // 复位 = 回 fit-to-viewport。jsdom 容器 0×0，fit 被守卫跳过（no-op）：
+    // 视口保持 panBy 后状态，但元素属性仍不动。
     apiRef.current!.resetViewport();
-    expect(canvas!.viewportTransform).toEqual([1, 0, 0, 1, 0, 0]);
+    expect(obj.left).toBe(before.left);
+    expect(obj.top).toBe(before.top);
   });
 
   it('卸载后 apiRef 置空', () => {

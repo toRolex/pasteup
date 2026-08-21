@@ -1,5 +1,15 @@
 import '@testing-library/jest-dom';
 
+// jsdom 无 ResizeObserver（FabricCanvas 挂载时 observe 容器用）。
+class ResizeObserverStub {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+if (typeof globalThis.ResizeObserver === 'undefined') {
+  (globalThis as Record<string, unknown>).ResizeObserver = ResizeObserverStub;
+}
+
 // fabric v7 在 jsdom 下初始化 fabric.Canvas 需要 canvas 2D context。
 // jsdom 的 getContext('2d') 默认返回 null，这里 stub 一个可工作的 2D context
 // 供桥接壳测试使用（无需 node-canvas 原生依赖）。
