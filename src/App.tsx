@@ -133,171 +133,184 @@ export default function App() {
       <JournalShell
         topbar={
           <div className="brand">
-            <span className="brand-title">
-              <CharReveal className="brand-name" text="pasteup · 手帐剪纸拼贴" />
-              <svg
-                className="brand-underline"
-                data-testid="brand-underline"
-                viewBox="0 0 220 10"
-                preserveAspectRatio="none"
-                aria-hidden="true"
-              >
-                <path
-                  className="underline-path"
-                  d="M 8 7 Q 70 2 130 6 T 214 5"
-                  fill="none"
-                  stroke="var(--tape)"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </span>
-            <button
-              className="tool-btn"
-              data-testid="new-project"
-              onClick={() => {
-                setFileError(null);
-                setDialogOpen(true);
-              }}
-            >
-              新建
-            </button>
-            <button
-              className="tool-btn"
-              data-testid="open-project"
-              onClick={() => void handleOpen()}
-            >
-              打开
-            </button>
-            <button
-              className="tool-btn"
-              data-testid="pick-color"
-              aria-label="屏幕取色"
-              title="屏幕取色（I）"
-              onClick={() => activatePicker()}
-            >
-              取色
-            </button>
-            <button
-              className={`tool-btn${tool === 'select' ? ' tool-btn--active' : ''}`}
-              data-testid="tool-select"
-              aria-pressed={tool === 'select'}
-              onClick={() => useToolStore.getState().setTool('select')}
-            >
-              选择
-            </button>
-            <button
-              className={`tool-btn${tool === 'trace' ? ' tool-btn--active' : ''}`}
-              data-testid="tool-trace"
-              aria-pressed={tool === 'trace'}
-              onClick={() => useToolStore.getState().setTool('trace')}
-            >
-              描绘
-            </button>
-            <button
-              className="tool-btn"
-              data-testid="undo"
-              aria-label="撤销"
-              title="撤销（⌘/Ctrl+Z）"
-              onClick={() => undo()}
-            >
-              撤销
-            </button>
-            <button
-              className="tool-btn"
-              data-testid="redo"
-              aria-label="重做"
-              title="重做（⇧⌘/Ctrl+Z）"
-              onClick={() => redo()}
-            >
-              重做
-            </button>
-            <button
-              className="tool-btn"
-              data-testid="save-project"
-              onClick={handleSave}
-            >
-              保存
-            </button>
-            <span className="save-status" data-testid="save-status">
-              {SAVE_STATUS_TEXT[saveStatus]}
-            </span>
-            {fileError && (
-              <span className="open-error" data-testid="open-error" role="alert">
-                {fileError}
+            <div className="topbar-group topbar-group--brand">
+              <span className="brand-title">
+                <CharReveal className="brand-name" text="pasteup · 手帐剪纸拼贴" />
+                <svg
+                  className="brand-underline"
+                  data-testid="brand-underline"
+                  viewBox="0 0 220 10"
+                  preserveAspectRatio="none"
+                  aria-hidden="true"
+                >
+                  <path
+                    className="underline-path"
+                    d="M 8 7 Q 70 2 130 6 T 214 5"
+                    fill="none"
+                    stroke="var(--tape)"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                  />
+                </svg>
               </span>
-            )}
-            <span className="brand-spacer" aria-hidden="true" />
-            <button
-              className="tool-btn"
-              data-testid="import-bg"
-              onClick={() => document.getElementById('bg-photo-input')?.click()}
-            >
-              导入底图
-            </button>
-            <input
-              id="bg-photo-input"
-              data-testid="bg-photo-input"
-              type="file"
-              accept="image/*"
-              hidden
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (!file) return;
-                const reader = new FileReader();
-                reader.onload = () => setBackgroundPhoto(String(reader.result));
-                reader.readAsDataURL(file);
-              }}
-            />
-            {bgPhoto && (
+            </div>
+            <span className="topbar-divider" aria-hidden="true" />
+            <div className="topbar-group" data-testid="topbar-file">
               <button
                 className="tool-btn"
-                data-testid="toggle-bg"
-                onClick={() => toggleBackgroundPhoto()}
+                data-testid="new-project"
+                onClick={() => {
+                  setFileError(null);
+                  setDialogOpen(true);
+                }}
               >
-                {bgPhoto.visible ? '隐藏底图' : '显示底图'}
+                新建
               </button>
-            )}
-            <button
-              className="tool-btn"
-              data-testid="export-svg"
-              onClick={() => void handleExportSvg()}
-            >
-              导出 SVG
-            </button>
-            <button
-              className="tool-btn"
-              data-testid="zoom-out"
-              aria-label="缩小视图"
-              onClick={() => apiRef.current?.zoomBy(0.8)}
-            >
-              −
-            </button>
-            <button
-              className="tool-btn"
-              data-testid="zoom-in"
-              aria-label="放大视图"
-              onClick={() => apiRef.current?.zoomBy(1.25)}
-            >
-              ＋
-            </button>
-            <button
-              className="tool-btn"
-              data-testid="zoom-reset"
-              aria-label="复位视图"
-              onClick={() => apiRef.current?.resetViewport()}
-            >
-              复位
-            </button>
-            <button
-              className="tool-btn"
-              data-testid="export-png"
-              aria-label="导出 PNG"
-              onClick={() => void handleExportPNG()}
-            >
-              导出 PNG
-            </button>
-            <CircleNote label="盖戳" testId="export-circle-note" className="circle-note--export" />
+              <button
+                className="tool-btn"
+                data-testid="open-project"
+                onClick={() => void handleOpen()}
+              >
+                打开
+              </button>
+              <button
+                className="tool-btn"
+                data-testid="save-project"
+                onClick={handleSave}
+              >
+                保存
+              </button>
+              <span className="save-status" data-testid="save-status">
+                {SAVE_STATUS_TEXT[saveStatus]}
+              </span>
+              {fileError && (
+                <span className="open-error" data-testid="open-error" role="alert">
+                  {fileError}
+                </span>
+              )}
+            </div>
+            <span className="topbar-divider" aria-hidden="true" />
+            <div className="topbar-group" data-testid="topbar-tools">
+              <button
+                className={`tool-btn${tool === 'select' ? ' tool-btn--active' : ''}`}
+                data-testid="tool-select"
+                aria-pressed={tool === 'select'}
+                onClick={() => useToolStore.getState().setTool('select')}
+              >
+                选择
+              </button>
+              <button
+                className={`tool-btn${tool === 'trace' ? ' tool-btn--active' : ''}`}
+                data-testid="tool-trace"
+                aria-pressed={tool === 'trace'}
+                onClick={() => useToolStore.getState().setTool('trace')}
+              >
+                描绘
+              </button>
+              <button
+                className="tool-btn"
+                data-testid="pick-color"
+                aria-label="屏幕取色"
+                title="屏幕取色（I）"
+                onClick={() => activatePicker()}
+              >
+                取色
+              </button>
+              <button
+                className="tool-btn"
+                data-testid="undo"
+                aria-label="撤销"
+                title="撤销（⌘/Ctrl+Z）"
+                onClick={() => undo()}
+              >
+                撤销
+              </button>
+              <button
+                className="tool-btn"
+                data-testid="redo"
+                aria-label="重做"
+                title="重做（⇧⌘/Ctrl+Z）"
+                onClick={() => redo()}
+              >
+                重做
+              </button>
+            </div>
+            <span className="topbar-divider" aria-hidden="true" />
+            <div className="topbar-group" data-testid="topbar-canvas">
+              <button
+                className="tool-btn"
+                data-testid="import-bg"
+                onClick={() => document.getElementById('bg-photo-input')?.click()}
+              >
+                导入底图
+              </button>
+              <input
+                id="bg-photo-input"
+                data-testid="bg-photo-input"
+                type="file"
+                accept="image/*"
+                hidden
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = () => setBackgroundPhoto(String(reader.result));
+                  reader.readAsDataURL(file);
+                }}
+              />
+              {bgPhoto && (
+                <button
+                  className="tool-btn"
+                  data-testid="toggle-bg"
+                  onClick={() => toggleBackgroundPhoto()}
+                >
+                  {bgPhoto.visible ? '隐藏底图' : '显示底图'}
+                </button>
+              )}
+              <button
+                className="tool-btn"
+                data-testid="zoom-out"
+                aria-label="缩小视图"
+                onClick={() => apiRef.current?.zoomBy(0.8)}
+              >
+                −
+              </button>
+              <button
+                className="tool-btn"
+                data-testid="zoom-in"
+                aria-label="放大视图"
+                onClick={() => apiRef.current?.zoomBy(1.25)}
+              >
+                ＋
+              </button>
+              <button
+                className="tool-btn"
+                data-testid="zoom-reset"
+                aria-label="复位视图"
+                onClick={() => apiRef.current?.resetViewport()}
+              >
+                复位
+              </button>
+            </div>
+            <span className="brand-spacer" aria-hidden="true" />
+            <div className="topbar-group" data-testid="topbar-export">
+              <button
+                className="tool-btn"
+                data-testid="export-png"
+                aria-label="导出 PNG"
+                onClick={() => void handleExportPNG()}
+              >
+                导出 PNG
+              </button>
+              <button
+                className="tool-btn"
+                data-testid="export-svg"
+                onClick={() => void handleExportSvg()}
+              >
+                导出 SVG
+              </button>
+              <CircleNote label="盖戳" testId="export-circle-note" className="circle-note--export" />
+            </div>
             <span className="tape tape--topbar" aria-hidden="true" />
           </div>
         }

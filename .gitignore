@@ -23,3 +23,10 @@ prototypes/**/shots/
 
 # playwright-cli 运行时会话产物
 .playwright-cli/
+
+# Claude / agent 本地配置与缓存
+.agents/
+.claude/
+.mcp.json
+.scratch/
+skills-lock.json
