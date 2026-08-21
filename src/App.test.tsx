@@ -69,7 +69,7 @@ describe('App 集成（seam S3）— 三栏骨架 + store 驱动的画布', () =
   it('渲染三栏骨架，grid 尺寸 56 / 260 / 34 / 280', () => {
     render(<App />);
     const journal = screen.getByTestId('journal');
-    expect(journal.style.gridTemplateRows).toBe(`${tokens.layout.topbar}px 1fr`);
+    expect(journal.style.gridTemplateRows).toBe(`${tokens.layout.topbar}px minmax(0, 1fr)`);
     expect(normalize(journal.style.gridTemplateColumns)).toBe(
       normalize(
         `${tokens.layout.left}px ${tokens.layout.spine}px minmax(0, 1fr) ${tokens.layout.right}px`,

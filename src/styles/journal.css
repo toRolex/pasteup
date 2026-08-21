@@ -101,6 +101,8 @@
 .journal-canvas {
   position: relative;
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -111,6 +113,10 @@
     inset -4px 0 8px -6px rgba(90, 70, 52, 0.28);
 }
 .journal-canvas [data-testid='fabric-canvas'] {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
   background: var(--bg);
   box-shadow: var(--shadow-lift);
   border-radius: var(--radius-chip);
@@ -245,6 +251,21 @@
   flex: 1;
 }
 
+/* ── 顶栏分组（手帐页眉：组内紧凑 8px + 组间手绘虚线分隔）──────── */
+.topbar-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.topbar-divider {
+  flex: none;
+  width: 10px;
+  height: 26px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='26'%3E%3Cpath d='M5 1 C4 7 6 11 5 15 C4 19 6 22 5 25' fill='none' stroke='rgba(90,70,52,0.38)' stroke-width='1.4' stroke-linecap='round' stroke-dasharray='2.5 3.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
 .tool-btn {
   display: inline-flex;
   align-items: center;
@@ -272,6 +293,44 @@
 }
 .tool-btn:active {
   transform: translateY(0);
+}
+
+/* ── 键盘焦点环（WCAG 2.1 AA）：朱红胶带色，与苔绿选中态区分；仅键盘导航触发 ── */
+.tool-btn:focus-visible,
+.texture-btn:focus-visible,
+.rotate-btn:focus-visible,
+.layer-op-btn:focus-visible,
+.swatch:focus-visible {
+  outline: 2px solid var(--tape);
+  outline-offset: 2px;
+}
+.layer-item:focus-visible {
+  outline: 2px solid var(--tape);
+  outline-offset: 1px;
+}
+
+/* ── 左/右栏滚动条（纸面拟物：半透明墨迹滑块，不破坏撕边纸面）────── */
+.journal-left,
+.journal-right {
+  scrollbar-width: thin;
+  scrollbar-color: oklch(0.32 0.045 60 / 0.28) transparent;
+}
+.journal-left::-webkit-scrollbar,
+.journal-right::-webkit-scrollbar {
+  width: 8px;
+}
+.journal-left::-webkit-scrollbar-track,
+.journal-right::-webkit-scrollbar-track {
+  background: transparent;
+}
+.journal-left::-webkit-scrollbar-thumb,
+.journal-right::-webkit-scrollbar-thumb {
+  background: oklch(0.32 0.045 60 / 0.2);
+  border-radius: var(--radius-chip);
+}
+.journal-left::-webkit-scrollbar-thumb:hover,
+.journal-right::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.32 0.045 60 / 0.34);
 }
 
 /* ── 右栏色卡面板（T15 当前选中色 + 「最近使用」MRU）──────── */

@@ -27,7 +27,7 @@ export function JournalShell({ topbar, leftPage, rightPage, children }: JournalS
       data-reduced-motion={reducedMotion ? 'true' : undefined}
       style={{
         display: 'grid',
-        gridTemplateRows: `${tokens.layout.topbar}px 1fr`,
+        gridTemplateRows: `${tokens.layout.topbar}px minmax(0, 1fr)`,
         gridTemplateColumns: `${tokens.layout.left}px ${tokens.layout.spine}px minmax(0, 1fr) ${tokens.layout.right}px`,
         gridTemplateAreas: '"topbar topbar topbar topbar" "left spine canvas right"',
       }}

@@ -58,7 +58,7 @@ describe('JournalShell（seam 3）— 三栏手帐本骨架', () => {
   it('grid 尺寸来自 tokens：rows 56px 1fr；columns 260 / 34 / 1fr / 280', () => {
     renderShell();
     const el = screen.getByTestId('journal');
-    expect(el.style.gridTemplateRows).toBe(`${tokens.layout.topbar}px 1fr`);
+    expect(el.style.gridTemplateRows).toBe(`${tokens.layout.topbar}px minmax(0, 1fr)`);
     expect(normalize(el.style.gridTemplateColumns)).toBe(
       normalize(`${tokens.layout.left}px ${tokens.layout.spine}px minmax(0, 1fr) ${tokens.layout.right}px`),
     );
