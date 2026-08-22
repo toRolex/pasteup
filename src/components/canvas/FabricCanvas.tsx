@@ -9,7 +9,7 @@
  * object:modified 回灌 / apiRef 导航 / 工具切换；渲染同步（失效判定 / 重建 / 纹理补丁 /
  * selection 恢复）归 projectRenderer。
  */
-import { useCallback, useEffect, useRef, type MutableRefObject } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, type MutableRefObject } from 'react';
 import { Canvas, Path, Point, type FabricObject, type TPointerEventInfo } from 'fabric';
 import type { PaperProject } from '../../types/project';
 import { findPaperObject, readTransform } from '../../fabric/paperBridge';
@@ -118,7 +118,9 @@ export function FabricCanvas({
   // 挂载：创建 fabric 画布并订阅事件（fabric 拥有画布内部状态）。
   // fabric v7 会把传入的 <canvas> 包进自建 wrapper，因此 React 只持有容器 div，
   // canvas 元素由本壳命令式创建，避免 React 虚拟 DOM 与 fabric 实际 DOM 布局脱节。
-  useEffect(() => {
+  // 用 useLayoutEffect：创建画布 + applyFit 必须在首帧绘制前同步完成，
+  // 否则浏览器会先按全尺寸（2480×3508）画一帧再收缩（首帧闪动）。
+  useLayoutEffect(() => {
     const container = containerElRef.current;
     if (!container) return;
     const canvasEl = document.createElement('canvas');
@@ -139,7 +141,8 @@ export function FabricCanvas({
     detachOrphanCanvas();
     canvasRef.current = canvas;
 
-    // 创建后立即 fit 一次（防首帧闪全尺寸画布，有意为之）；此后由 RO 跟随容器变化。
+    // 创建后立即 fit 一次（layout effect 保证在首帧绘制前完成，不闪全尺寸画布）；
+    // 此后由 RO 跟随容器变化。
     applyFit();
 
     // ResizeObserver 跟随容器：回调先对比尺寸，相同 early-return

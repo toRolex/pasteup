@@ -41,24 +41,25 @@ export function panBy(canvas: Canvas, dx: number, dy: number): void {
   canvas.setViewportTransform(vpt);
 }
 
+/** 尺寸（宽×高）：fit 计算中世界与视口共用的形态。 */
+type Size = { width: number; height: number };
+
 /**
  * fit 缩放纯函数：世界尺寸装进视口的 min 比例 × FIT_MARGIN。
  * 不经过 setZoom 的 [MIN_ZOOM, MAX_ZOOM] 钳制——fit 与用户 ± 缩放是两套
  * 钳制语义，超小容器下 fit < MIN_ZOOM 也必须生效，否则画布再次溢出视口。
  */
-export function computeFitZoom(worldW: number, worldH: number, viewW: number, viewH: number): number {
-  if (worldW <= 0 || worldH <= 0 || viewW <= 0 || viewH <= 0) return FIT_MARGIN;
-  return Math.min(viewW / worldW, viewH / worldH) * FIT_MARGIN;
+export function computeFitZoom(world: Size, view: Size): number {
+  if (world.width <= 0 || world.height <= 0 || view.width <= 0 || view.height <= 0) {
+    return FIT_MARGIN;
+  }
+  return Math.min(view.width / world.width, view.height / world.height) * FIT_MARGIN;
 }
 
 /** 视口适配：DOM 尺寸改为容器尺寸 + viewportTransform 设为 fit 居中矩阵。 */
-export function fitToViewport(
-  canvas: Canvas,
-  view: { width: number; height: number },
-  world: { width: number; height: number },
-): void {
+export function fitToViewport(canvas: Canvas, view: Size, world: Size): void {
   canvas.setDimensions({ width: view.width, height: view.height });
-  const zoom = computeFitZoom(world.width, world.height, view.width, view.height);
+  const zoom = computeFitZoom(world, view);
   canvas.setViewportTransform([zoom, 0, 0, zoom,
     (view.width - world.width * zoom) / 2,
     (view.height - world.height * zoom) / 2,

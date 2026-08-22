@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, render } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { Canvas, Point, type TPointerEventInfo } from 'fabric';
 import { FabricCanvas, type FabricCanvasApi } from './FabricCanvas';
+import { FIT_MARGIN } from '../../fabric/viewport';
 import { useToolStore } from '../../store/toolStore';
 import {
   createEmptyProject,
@@ -128,6 +129,33 @@ describe('FabricCanvas 导航 API（seam S5）— apiRef 只改视口不动元�
     apiRef.current!.resetViewport();
     expect(obj.left).toBe(before.left);
     expect(obj.top).toBe(before.top);
+  });
+
+  it('复位 = 回 fit-to-viewport 矩阵（容器有布局尺寸时：zoom=fitScale 且世界居中）', () => {
+    const apiRef: { current: FabricCanvasApi | null } = { current: null };
+    const project = projectWithOnePaper(); // 世界 1200×800
+
+    render(<FabricCanvas project={project} apiRef={apiRef} />);
+    const canvas = lastCanvas();
+    // jsdom 无布局：打桩容器尺寸，让 applyFit 的零尺寸守卫放行
+    const container = screen.getByTestId('fabric-canvas');
+    Object.defineProperty(container, 'clientWidth', { value: 600, configurable: true });
+    Object.defineProperty(container, 'clientHeight', { value: 400, configurable: true });
+
+    // 先扰动视口（缩放 + 平移），再复位
+    apiRef.current!.zoomBy(2);
+    apiRef.current!.panBy(50, 30);
+    apiRef.current!.resetViewport();
+
+    const zoom = Math.min(600 / 1200, 400 / 800) * FIT_MARGIN;
+    const vpt = canvas.viewportTransform;
+    expect(vpt[0]).toBeCloseTo(zoom);
+    expect(vpt[3]).toBeCloseTo(zoom);
+    // 世界中心 (600, 400) 映射到视口中心 (300, 200)
+    expect(vpt[4]).toBeCloseTo((600 - 1200 * zoom) / 2);
+    expect(vpt[5]).toBeCloseTo((400 - 800 * zoom) / 2);
+    expect(canvas.getWidth()).toBe(600);
+    expect(canvas.getHeight()).toBe(400);
   });
 
   it('卸载后 apiRef 置空', () => {

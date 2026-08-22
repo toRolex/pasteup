@@ -98,25 +98,25 @@ describe('viewport（seam S4）— 画布视口平移/缩放', () => {
 describe('computeFitZoom — 视口适配纯函数（不经过用户缩放钳制）', () => {
   it('竖版 A4@300dpi 进横视口：宽高取 min，乘 FIT_MARGIN', () => {
     // min(634/2480, 592/3508) = min(0.2556, 0.1688) → 高受限
-    const scale = computeFitZoom(2480, 3508, 634, 592);
+    const scale = computeFitZoom({ width: 2480, height: 3508 }, { width: 634, height: 592 });
     expect(scale).toBeCloseTo(Math.min(634 / 2480, 592 / 3508) * FIT_MARGIN);
     expect(scale).toBeGreaterThan(0.05); // 不被用户 MIN_ZOOM 钳掉
   });
 
   it('横版 A4@96dpi（1123×794）进近方形视口：宽受限', () => {
-    const scale = computeFitZoom(1123, 794, 600, 600);
+    const scale = computeFitZoom({ width: 1123, height: 794 }, { width: 600, height: 600 });
     expect(scale).toBeCloseTo((600 / 1123) * FIT_MARGIN);
   });
 
   it('超小容器：fit 值低于 MIN_ZOOM 也不被钳制（fit 与用户缩放两套钳制语义）', () => {
-    const scale = computeFitZoom(2480, 3508, 100, 80);
+    const scale = computeFitZoom({ width: 2480, height: 3508 }, { width: 100, height: 80 });
     expect(scale).toBeCloseTo(Math.min(100 / 2480, 80 / 3508) * FIT_MARGIN);
     expect(scale).toBeLessThan(MIN_ZOOM);
   });
 
   it('退化输入（零尺寸世界或视口）：回落安全值不产生 NaN/Infinity', () => {
-    expect(computeFitZoom(0, 3508, 634, 592)).toBe(FIT_MARGIN);
-    expect(computeFitZoom(2480, 3508, 0, 0)).toBe(FIT_MARGIN);
+    expect(computeFitZoom({ width: 0, height: 3508 }, { width: 634, height: 592 })).toBe(FIT_MARGIN);
+    expect(computeFitZoom({ width: 2480, height: 3508 }, { width: 0, height: 0 })).toBe(FIT_MARGIN);
   });
 });
 
@@ -129,7 +129,7 @@ describe('fitToViewport — DOM 尺寸=容器 + viewportTransform 设 fit 居中
     expect(canvas.getWidth()).toBe(634);
     expect(canvas.getHeight()).toBe(592);
     const vpt = canvas.viewportTransform;
-    expect(vpt[0]).toBeCloseTo(computeFitZoom(2480, 3508, 634, 592));
+    expect(vpt[0]).toBeCloseTo(computeFitZoom({ width: 2480, height: 3508 }, { width: 634, height: 592 }));
     // 世界中心 (1240, 1754) 经 vpt 映射后落在视口中心 (317, 296)
     const wx = 2480 / 2, wy = 3508 / 2;
     expect(vpt[0] * wx + vpt[4]).toBeCloseTo(634 / 2, 0);
