@@ -1,6 +1,7 @@
 [package]
 name = "pasteup"
 version = "0.1.0"
+license = "GPL-3.0-or-later"
 description = "手帐剪纸拼贴绘图 app：照片描摹 → 纸片元素 → 拼贴排版 → 导出 PNG/SVG"
 authors = ["pasteup"]
 edition = "2021"

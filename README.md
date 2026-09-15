@@ -9,6 +9,7 @@
   <img src="https://img.shields.io/badge/Zustand-5-7A8B5C?labelColor=E8DFC6" alt="Zustand 5" />
   <img src="https://img.shields.io/badge/TypeScript-5.8-7A8B5C?labelColor=E8DFC6" alt="TypeScript 5.8" />
   <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-7A6852?labelColor=E8DFC6" alt="macOS | Windows" />
+  <img src="https://img.shields.io/badge/license-GPL--3.0-64734A?labelColor=E8DFC6" alt="GPL-3.0" />
 </p>
 
 # pasteup
