@@ -1,5 +1,14 @@
 <p align="center">
-  <img src="src-tauri/icons/128x128@2x.png" width="120" height="120" alt="pasteup logo" />
+  <img src="docs/assets/banner.png" width="100%" alt="pasteup — 手帐剪纸拼贴绘图" />
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Fabric.js-v7-7A8B5C?labelColor=E8DFC6" alt="Fabric.js v7" />
+  <img src="https://img.shields.io/badge/Tauri-2-7A8B5C?labelColor=E8DFC6" alt="Tauri 2" />
+  <img src="https://img.shields.io/badge/React-18-7A8B5C?labelColor=E8DFC6" alt="React 18" />
+  <img src="https://img.shields.io/badge/Zustand-5-7A8B5C?labelColor=E8DFC6" alt="Zustand 5" />
+  <img src="https://img.shields.io/badge/TypeScript-5.8-7A8B5C?labelColor=E8DFC6" alt="TypeScript 5.8" />
+  <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-7A6852?labelColor=E8DFC6" alt="macOS | Windows" />
 </p>
 
 # pasteup
@@ -80,7 +89,12 @@ src/
 └── utils/        # 颜色、通用工具
 src-tauri/        # Tauri 2 桌面壳（Rust）
 prototypes/       # 纹理/渲染/UI 方向的原型实验
-docs/             # 实施计划、渲染引擎选型、ADR
+tools/            # README 品牌卡片生成脚本（同源字体 + 调色板）
+docs/
+├── assets/       # banner / 社交预览卡（`tools/make-readme-assets.py` 生成）
+├── implementation-plan.md
+├── research/     # 渲染引擎选型
+└── adr/          # 架构决策记录
 ```
 
 > [!NOTE]
